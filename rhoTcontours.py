@@ -1,14 +1,5 @@
-#import sys
-#import matplotlib.pyplot as plt
-#import pylab
-#from scipy.interpolate import interp1d
-#from scipy.interpolate import interp2d
-#from myhelmholtz import *
-#from matplotlib.font_manager import fontManager, FontProperties
-
 import numpy as np
-#from numpy import *
-import myhelmstarmod as myhelm
+import myhelm_magstar as myhmag
 import pylab
 import scipy.interpolate as interp
 
@@ -62,12 +53,12 @@ class timescale_data:
 
 	def getP0(self):
 		"""Calculates degeneracy component of the pressure."""
-		myhelm.initializehelmholtz()
+		myhmag.initializehelmholtz()
 		abar = 13.714285714285715
 		zbar = abar/2.0
 		self.data["P0"] = np.zeros(len(self.data["rho"]))
 		for i in range(len(self.data["rho"])):
-			self.data["P0"][i],energ,sound,gammaout,entropy,dummyfail = myhelm.gethelmholtzeos(1000.,self.data["rho"][i],abar,zbar,True)
+			self.data["P0"][i],energ,sound,gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(1000.,self.data["rho"][i],abar,zbar,True)
 
 
 	def getdatap(self, max_axes):
