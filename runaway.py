@@ -1,201 +1,177 @@
+Star = __import__("StarMod_Jacobian")
+import magprofile_mass as magprof
 import numpy as np
-from scipy.interpolate import UnivariateSpline
-from scipy.optimize import curve_fit
-import os, sys
 import copy
+import os, sys
 
-################HYDROSTAR CLASS###############################
-
-class magprofile:
-	"""Magnetic field profiler.  Returns functions fBfld and fBderiv, which allow for 
-
-		Arguments:
-		radius - radius
-		mass - mass
-		Bfld - B(r) profile
-		gamma - defined in Feiden & Chaboyer 12 as a geometric correction to the magnetic pressure, i.e. Pchi = (gamma - 1)B^2/8/pi.  Defaults to 4./3. (maximum magnetic tension), can go up to 2 (no tension)
-		filename - read profile from file (class constructor will not read radius or Bfld in that case)
-		getpres - if non-zero, the gamma value of (gamma - 1)chi*rho = (gamma - 1)B^2/8/pi.  THIS CURRENTLY DOES NOT WORK PROPERLY (probably too steep for splines)
-		smooth - smooth profile before using it for interpolation
-		method - either "spline", "pwr" or "brokenpwr"
-		bpargs - list of two arrays, each denoting the radius range for fitting each segment of the broken power law; by default, [np.array([1e6,2e8]), np.array([8e8, 1e10])]
-		renorm - renormalize fit to central magnetic strength
-		checkposderiv - check Bfld derivative to always be positive
-		blankfunc - if true, returns a function with Bfld = 0, Bderiv = 0
+def obtain_model(mystar, i, r_in, verbose=False):
+	"""Used by make_runaway to calculate models with increasing entropy S_want.
 	"""
 
-	def __init__(self, radius, mass, Bfld, gamma=4./3., filename=False, smooth=False, method="brokenpwr", bpargs=[np.array([1e6,2e8]), np.array([8e8, 1e10])], 
-					min_r=1e3, spline_k=3, spline_s=1., renorm=False, checkposderiv=True, blankfunc=False):
+	S_want = r_in["S_arr"][i]	# Central entropy wanted for this step.
 
-		self.gamma = gamma
-		self.nabladev = False
-		self.spline_k = spline_k
-		self.spline_s = spline_s
-		self.min_r = min_r
+	# Obtain initial density and omega estimates from previous (the coefficients are purely empirical)
+	densest = 0.8*mystar.data["rho"][0]
+	if r_in.has_key("L_original"):
+		omegaest = 0.9*mystar.omega
 
-		if blankfunc:
-			def fBfld(r, m):
-				return 0.*r
-			def fBderiv(r, m, drdm):
-				return 0.*r
+	# Empirically density estimates below 1e6 are less accurate, so we need more error tolerance
+	if densest < 1e6:
+		ps_eostol = 100.*r_in["ps_eostol"]
+		P_end_ratio = 100.*r_in["P_end_ratio"]
+		print "Running at reduced eostol = {0:.3e}; P_end_ratio = {1:.3e}".format(ps_eostol, P_end_ratio)
+	elif densest < 1e7:
+		ps_eostol = 10.*r_in["ps_eostol"]
+		P_end_ratio = 10.*r_in["P_end_ratio"]
+		print "Running at reduced eostol = {0:.3e}; P_end_ratio = {1:.3e}".format(ps_eostol, P_end_ratio)
+	else:
+		ps_eostol = r_in["ps_eostol"]
+		P_end_ratio = r_in["P_end_ratio"]
+
+	# Right now I'll define these here, but if we want to reduce the stepcoeffs
+	deltastepcoeff_rho = 0.1
+	deltastepcoeff_omega = 0.1
+	damp_nrstep = 0.25
+	
+	if r_in.has_key("L_original"):
+		outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
+													omega_warn=1.)
+		if outerr_code:
+			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH 0.5*OMEGA ---------------"
+			outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=0.5*omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
+													omega_warn=1.)
+#	if r_in.has_key("L_original"):
+#		outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+#		if outerr_code:
+#			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH A LOWER OMEGA AND TIGHTER STEPPING---------------"
+#			outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+	else:
+		outerr_code = mystar.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+										deltastepcoeff=deltastepcoeff_rho)
+
+	return outerr_code
+
+
+def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), mintemp=1e4, derivtype="sim", mass_tol=1e-3, P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, simd_userot=True, simd_usegammavar=True, simd_usegrav=True, simd_suppress=False, omega_crit_tol=1e-2, omega_warn=10., verbose=True):
+	"""Obtains runaway of a star of some given mass, magnetic field, and rotation.  Outputs an object (usually several hundred megs large) that includes run inputs as "run_inputs", as well as all stellar output curves (hence its size) under "stars".
+
+	Arguments:
+	starmass: wanted mass
+	mymag: magnetic profile object.  Defaults to false, meaning no magnetic field.
+	omega: rigid rotation angular velocity.  Defaults to 0 (non-rotating).  If < 0, attempts to estimate break-up omega with self.getomegamax(), if >= 0, uses user defined value.
+	S_arr: list of central entropy values in the runaway track
+	mintemp: temperature floor, effectively switches from adiabatic to isothermal profile if reached
+	derivtype: derivative function used
+	mass_tol: fractional tolerance between mass wanted and mass produced by self.getstarmodel()
+	P_end_ratio: ratio of P/P_c at which to terminate stellar integration
+	densest: central density initial estimate for self.getstarmodel()
+	L_tol: conservation of angular momentum error tolerance
+	simd_userot: use Solberg-Hoiland deviation from adiabatic temperature gradient
+	simd_usegammavar: use gamma = c_P/c_V index magnetic deviation from adiabatic temperature gradient
+	simd_usegrav: use gravity magnetic devation from adiabatic temperature gradient
+	simd_suppress: suppresses deviations from adiabaticity in first step of integration
+	omega_crit_tol: when using mystar.getomegamax(), absolute error tolerance for maximum omega
+	omega_warn: stop integration within mystar.getrotatingstarmodel() if self.omega approaches omega_warn*omega_crit estimate.  Defaults to 10 to prevent premature stoppage.
+	verbose: report happenings within code
+	"""
+
+	r_in = {"mass": starmass, 
+			"magprofile": mymag, 
+			"omega": omega, 
+			"omega_run_rat": omega_run_rat, 
+			"S_arr": S_arr, 
+			"mintemp": mintemp,  
+			"derivtype": derivtype, 
+			"composition": "CO",
+			"simd_userot": simd_userot, 
+			"simd_usegammavar": simd_usegammavar, 
+			"simd_usegrav": simd_usegrav, 
+			"simd_suppress": simd_suppress, 
+			"P_end_ratio": P_end_ratio, 
+			"ps_eostol": 1e-8, 
+			"fakeouterpoint": False, 
+			"stop_invertererr": True, 
+			"stop_mrat": 2., 
+			"stop_positivepgrad": True, 
+			"densest": densest, 
+			"mass_tol": mass_tol,
+			"L_tol": L_tol, 
+			"omega_crit_tol": omega_crit_tol, 
+			"omega_warn": omega_warn}
+
+	if (omega != 0) or r_in["magprofile"]:
+		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
+		mymagzero = magprof.magprofile(None, None, None, blankfunc=True)
+		hstar = Star.maghydrostar(r_in["mass"], 5e6, magprofile=mymagzero, omega=0., S_want=False, mintemp=r_in["mintemp"], derivtype=r_in["derivtype"], composition=r_in["composition"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+		densest=0.9*hstar.data["rho"][0]
+
+	print "*************Okay, let's make a low-temperature (MHD/rotating) star************"
+	mystar = Star.maghydrostar(r_in["mass"], 5e6, magprofile=r_in["magprofile"], omega=r_in["omega"], S_want=False, 	#Rest after this is identical to function call above
+				mintemp=r_in["mintemp"], derivtype=r_in["derivtype"], composition=r_in["composition"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+
+	if r_in["omega"] < 0:
+		print "FOUND critical Omega = {0:.3e}!  We'll use {1:.3e} of this value for the runaway.".format(mystar.omega, r_in["omega_run_rat"])
+		r_in["omega_crit_foundinfirststep"] = mystar.omega
+		mystar.omega *= r_in["omega_run_rat"]
+
+		mystar.getstarmodel(densest=0.9*mystar.data["rho"][0], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"])
+
+	if r_in["omega"]:
+		if mystar.omega > mystar.getcritrot(max(mystar.data["M"]), mystar.data["R"][-1]):
+			print "WARNING: exceeding estimated critical rotation!  Consider restarting this run."
+		r_in["L_original"] = mystar.getmomentofinertia(mystar.data["R"], mystar.data["rho"])[-1]*mystar.omega
+		mystar.L_want = r_in["L_original"]			# Store initial angular momentum for future use.
+
+	out_dict = {"temp_c": np.zeros(len(S_arr)+1),
+		"dens_c": np.zeros(len(S_arr)+1),
+		"omega": np.zeros(len(S_arr)+1),
+		"B_c": np.zeros(len(S_arr)+1),
+		"S_c": np.zeros(len(S_arr)+1),
+		"R": np.zeros(len(S_arr)+1),
+		"stars": []}
+
+	if "R_nuc" not in mystar.data.keys():	# Obtain timescale info if it's not already printed.
+		mystar.gettimescales()
+
+	out_dict["run_inputs"] = r_in
+	if r_in["omega"] < 0:
+		out_dict["omega_crit"] = r_in["omega_crit_foundinfirststep"]
+	out_dict["S_c"][0] = mystar.data["Sgas"][0]
+	out_dict["temp_c"][0] = mystar.data["T"][0]
+	out_dict["dens_c"][0] = mystar.data["rho"][0]
+	out_dict["omega"][0] = mystar.omega
+	out_dict["B_c"][0] = np.mean(mystar.data["B"][:10])
+	out_dict["R"][0] = mystar.data["R"][-1]
+	if keepstars:
+		out_dict["stars"].append(copy.deepcopy(mystar))
+	else:
+		out_dict["stars"].append(copy.deepcopy(mystar.data))
+
+	for i in range(len(r_in["S_arr"])):
+
+		print "*************Star #{0:d}, entropy = {1:.3f}************".format(i, r_in["S_arr"][i])
+
+		outerr_code = obtain_model(mystar, i, r_in, verbose=verbose)
+
+		if outerr_code:
+			print "===== RUNAWAY.PY REPORTS OUTERR: ", outerr_code, "so will stop model making! ====="
+			break
+
+		if "R_nuc" not in mystar.data.keys():	# Obtain timescale info if it's not already printed.
+			mystar.gettimescales()
+		out_dict["S_c"][i+1] = mystar.data["Sgas"][0]
+		out_dict["temp_c"][i+1] = mystar.data["T"][0]
+		out_dict["dens_c"][i+1] = mystar.data["rho"][0]
+		out_dict["omega"][i+1] = mystar.omega
+		out_dict["B_c"][i+1] = np.mean(mystar.data["B"][:10])
+		out_dict["R"][i+1] = mystar.data["R"][-1]
+		if keepstars:
+			out_dict["stars"].append(copy.deepcopy(mystar))
 		else:
-			#Load in files
-			if filename:
-				f_in = open(filename, 'r')
-				f_in_data = np.loadtxt(f_in)
-				self.radius = np.array(f_in_data[:,0])
-				self.mass = np.array(f_in_data[:,1])
-				self.Bfld = np.array(f_in_data[:,2])
-			else:
-				self.radius = radius
-				self.Bfld = Bfld
-				self.mass = mass
+			out_dict["stars"].append(copy.deepcopy(mystar.data))
 
-			#Smooth magnetic field profile, if necessary
-			if smooth:
-				self.Bfld = self.movingaverage(self.Bfld, smooth)
-
-			#Derive magnetic field function
-			if method == "spline":
-				[self.fBfld_r, self.fBderiv_r] = self.getspline_Bfld()
-			elif method == "pwr":
-				[self.fBfld_r, self.fBderiv_r] = self.getpwr(bpargs, renorm)
-			else:
-				[self.fBfld_r, self.fBderiv_r] = self.getbrokenpwr(bpargs, renorm)
-
-			if checkposderiv:
-				testout = self.fBderiv_r(self.radius)
-				args = testout > 0
-				if len(testout[args] > 0):
-					print "WARNING: positive magnetic slope detected!  Minimum r with positive slope is {0:3e}".format(min(self.radius[args]))
-
-			#Derive mass function
-			[self.frass, self.frderiv] = self.getspline_radius()
-
-			[fBfld, fBderiv] = self.getfBfld()
-
-		self.fBfld = fBfld
-		self.fBderiv = fBderiv
-
-
-###################################Function Maker##########################################
-
-	def getfBfld(self):
-
-		#Deepcopy these functions in case they get changed later
-		fBfld_r = copy.deepcopy(self.fBfld_r)
-		fBderiv_r = copy.deepcopy(self.fBderiv_r)
-		frass = copy.deepcopy(self.frass)
-		frderiv = copy.deepcopy(self.frderiv)
-
-		max_m = self.mass[-1]
-
-		#Define field and field derivative functions
-		def fBfld(r, m):
-			if m >= max_m:
-				return 0.
-			else:
-				r_0 = max(frass(m), self.min_r)
-				return fBfld_r(r_0)*(r_0/max(r, self.min_r))**2
-
-		def fBderiv(r, m, dmdr):
-			if m >= max_m:
-				return 0.
-			else:
-				r_0 = max(frass(m), self.min_r)
-				dr0dr = frderiv(m)*dmdr
-				return ((r_0/max(r, self.min_r))**2*fBderiv_r(r_0) + 2.*fBfld_r(r_0)*r_0/max(r, self.min_r)**2)*dr0dr - 2*fBfld_r(r_0)*r_0**2/max(r, self.min_r)**3
-
-		return [fBfld, fBderiv]
-
-
-###################################Fitting Functions#######################################
-
-	#Cubic spline interpolation of magnetic field profile
-	def getspline_Bfld(self):
-		if self.radius[0]:
-			radius_ext = np.concatenate([np.array([0]), self.radius, np.array([1e12])])
-			Bfld_ext = np.concatenate([np.array([self.Bfld[0]]), self.Bfld, np.array([1e-3*min(self.Bfld)])])
-		else:
-			radius_ext = self.radius
-			Bfld_ext = self.Bfld
-		fBfld = UnivariateSpline(radius_ext, Bfld_ext, k=self.spline_k)
-		fBderiv = fBfld.derivative()
-		return [fBfld, fBderiv]
-
-
-	#Cubic spline interpolation of radius as a function of cumulative mass
-	def getspline_radius(self):
-		if self.radius[0]:
-#			radius_ext = np.concatenate([np.array([0]), self.radius, np.array([1e12])])
-#			mass_ext = np.concatenate([np.array([0]), self.mass, np.array([max(self.mass)])])
-			radius_ext = np.concatenate([np.array([0]), self.radius])
-			mass_ext = np.concatenate([np.array([0]), self.mass])
-		else:
-			radius_ext = self.radius
-			mass_ext = self.mass
-		frad = UnivariateSpline(mass_ext, radius_ext, k=self.spline_k, s=self.spline_s*len(radius_ext))
-		frderiv = frad.derivative()
-		if np.isnan(frad(1e33)):
-			jesus = lord
-		return [frad, frderiv]
-
-
-	#Fits a broken power law - first the two power law sections are fit to, then the normalization and knee.  The normalization
-	#can be scaled afterward ("renorm"), but a single fit to the entire data set with curve_fit favours large values over small.
-	def getbrokenpwr(self, bpargs, renorm):
-		interior_limits = bpargs[0]
-		exterior_limits = bpargs[1]
-		args_int = (self.radius > interior_limits[0])*(self.radius < interior_limits[1])
-		args_ext = (self.radius > exterior_limits[0])*(self.radius < exterior_limits[1])
-		fit_int = np.polyfit(np.log(self.radius[args_int]), np.log(self.Bfld[args_int]), 1)
-		fit_ext = np.polyfit(np.log(self.radius[args_ext]), np.log(self.Bfld[args_ext]), 1)
-		beta1 = fit_int[0]
-		beta2 = fit_ext[0]
-
-		#Yay, I get to use a closure! a = normalization, b = characteristic radius of power law knee
-		def func_to_fit(x, a, b):
-			return a*((x/b)**(-2*beta1) + (x/b)**(-2*beta2))**-0.5
-
-		fit_output = curve_fit(func_to_fit, self.radius[self.radius < bpargs[1][1]], self.Bfld[self.radius < bpargs[1][1]], p0=[1e11, 1e9])
-		B0 = fit_output[0][0]
-		r0 = fit_output[0][1]
-
-		if renorm:
-			B0 = renorm*((self.radius[0]/r0)**(-2*beta1) + (self.radius[0]/r0)**(-2*beta2))**0.5
-
-		fBfld = lambda x: B0*((x/r0)**(-2*beta1) + (x/r0)**(-2*beta2))**-0.5
-		fBderiv = lambda x: (B0/r0)*((x/r0)**(-2*beta1) + (x/r0)**(-2*beta2))**-1.5*(beta1*(x/r0)**(-2*beta1 - 1) + beta2*(x/r0)**(-2*beta2 - 1))
-
-		self.fitresults_Bfld = {"beta1": beta1,"beta2": beta2, "B0": B0, "r0": r0}
-
-		return [fBfld, fBderiv]
-
-
-	def getpwr(self, bpargs, renorm):
-		limits = [bpargs[0][0], bpargs[1][1]]
-		args = (self.radius > limits[0])*(self.radius < limits[1])
-		fit = np.polyfit(np.log(self.radius[args]), np.log(self.Bfld[args]), 1)
-
-		fBfld = lambda x: np.exp(fit[1])*x**fit[0]
-		fBderiv = lambda x: np.exp(fit[1])*fit[0]*x**(fit[0] - 1.)
-
-		self.fitresults_Bfld = {"B0": np.exp(fit[1]),"exponent": fit[0]}
-
-		return [fBfld, fBderiv]
-
-
-	@staticmethod
-	#Same as the moving average in Analyzer.py
-	def movingaverage(interval, window_size):
-		"""Returns the smoothed curve of interval.  Recently fixed kernel offset and edge effects with ghost cells.
-
-		smoothed = movingaverage(interval, window_size)
-			interval: set of data to be smoothed
-			window_size: number of elements to smooth over; if an even number is given, +1 is added
-		"""
-
-		ghost = int(floor(window_size/2.))
-		window_size = 2*ghost + 1
-		interval_extend = concatenate([interval[0]*ones(ghost), interval, interval[1]*ones(ghost)])
-		return convolve(interval_extend, ones(int(window_size))/float(window_size), 'valid')
+	return out_dict
