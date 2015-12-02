@@ -7,10 +7,10 @@ A Python-based hydrostatic spherical white dwarf (WD) integrator that utilizes T
 
 I'm currently using the following modules:
 
--numpy 1.10.1
--scipy 0.16.1
--matplotlib 1.5.0
--cPickle 1.71
+- numpy 1.10.1
+- scipy 0.16.1
+- matplotlib 1.5.0
+- cPickle 1.71
 
 I don't guarantee that the code will work (though it likely will) for Python builds with earlier versions of these modules.  To install the modules above without overwriting your current Python setup, you can create a [Python virtual environment](http://docs.python-guide.org/en/latest/dev/virtualenvs/).
 
