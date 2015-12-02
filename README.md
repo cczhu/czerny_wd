@@ -43,9 +43,11 @@ To build a runaway track for a 1.2 Msun non-rotating, unmagnetized WD (warning; 
 ```python
 import runaway as rw
 import rhoTcontours as rtc
+#Create runaway track using make_runaway()
 static_tol = 1e-6
 static_S = [1e7,2e7,3e7,4e7,5e7] + list(10.**arange(log10(6e7), log10(2.2e8*1.01), 0.005))
 od_1pt2Msun = rw.make_runaway(starmass=1.2*1.9891e33, verbose=True, mass_tol=static_tol, S_arr=static_S, simd_userot=False, simd_usegammavar=False, simd_usegrav=False)
+#Generates rho-T diagram
 [fig, ax] = rtc.get_figure(axes=[10**5.5,10**9.25,10**7.0,10**9.75])
 ax.plot(od_1pt2Msun["dens_c"], od_1pt2Msun["temp_c"], 'k-', lw=2)
 ```
