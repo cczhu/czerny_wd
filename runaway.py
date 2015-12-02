@@ -1,4 +1,4 @@
-Star = __import__("StarMod_Jacobian")
+import StarMod as Star
 import magprofile_mass as magprof
 import numpy as np
 import copy

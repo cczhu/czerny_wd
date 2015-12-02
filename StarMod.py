@@ -692,7 +692,6 @@ class maghydrostar:
 		#magnetic gamma and gravitational terms
 		if self.simd_usegammavar:
 			press_est = press + dydx[1]*m_step
-#			temp_dummy,dens_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,failtrig[0] = myhmag.geteosinversionsp_withest(self.abar,self.zbar,dens,temp,press_est,entropy,True,True,ps_eostol)
 			[dens_dummy, temp_dummy, Gamma1_est] = self.getdens_PS_est(press_est, entropy, failtrig=failtrig, dens_est=dens, temp_est=temp, eostol=ps_eostol)	#assumes adiabatic
 			nabla_terms["dlngamdlnP"] = (press/Gamma1)*(Gamma1_est - Gamma1)/(press_est - press)	#dlngamma/dlnP = (P/gamma)*(dgamma/dP)
 			nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press)*nabla_terms["dlngamdlnP"]
@@ -705,12 +704,9 @@ class maghydrostar:
 
 		#rotational term
 		if self.simd_userot:
-			if temp > self.mintemp:
-				H_Poverg = min(press*R**4/(dens*self.grav**2*mass**2), 1./(self.grav*dens))		#H_P/g
-				nabla_terms["nd_rot"] = 4.*(2./3.)**0.5*H_Poverg*omega**2/delta
-				deviation += nabla_terms["nd_rot"]
-			else:
-				nabla_terms["nd_rot"] = 0.	#insurance policy in case -d\rho/dT diverges
+			H_Poverg = min(press*R**4/(dens*self.grav**2*mass**2), 1./(self.grav*dens))		#H_P/g
+			nabla_terms["nd_rot"] = 4.*(2./3.)**0.5*H_Poverg*omega**2/delta
+			deviation += nabla_terms["nd_rot"]
 
 		totalgrad = hydrograd + deviation
 		dydx[2] = mintemp_func_current*temp/press*totalgrad*dydx[1]
@@ -888,7 +884,7 @@ class maghydrostar:
 		outputerr: output any error codes received from integrator
 		"""
 
-		stepsize = self.mass_want*0.01*min(self.mass_tol, 1e-6)	# Found out the hard way that if you use simd_usegammavar, having a large mass_tol can cause errors
+		stepsize = max(self.mass_want,0.4*self.Msun)*0.01*min(self.mass_tol, 1e-6)	# Found out the hard way that if you use simd_usegammavar, having a large mass_tol can cause errors
 
 #		if ps_eostol > 1e-8:
 #			print "WARNING: ps_eostol is now {0:.3e}".format(ps_eostol)
