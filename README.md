@@ -1,7 +1,7 @@
 # czerny_wd
-<h2>Charles Zhu's Experimental (nuclear) RuNawaY of (possibly spinning, magnetic) White Dwarfs Code ([CZERNY](https://en.wikipedia.org/wiki/Carl_Czerny)-WD Code)</h2>
+<h2>Charles Zhu's Experimental (nuclear) RuNawaY of (possibly spinning, magnetic) White Dwarfs Code (CZERNY-WD Code)</h2>
 
-A Python-based hydrostatic spherical white dwarf (WD) integrator that utilizes Timmes' [Helmholtz EOS](http://cococubed.asu.edu/code_pages/eos.shtml).  Also included is effective pressure support and convective suppression due rotation (via the Chandrasekhar approximation and Solberg-Hoiland criterion), and convective suppression due to magnetic fields (using [Gough & Tayler 1966](http://adsabs.harvard.edu/abs/1966MNRAS.133...85G)).  Prototype was used to generate initial conditions for Zhu et al. 2013 and Zhu et al. 2015.  Currently being used to investigate nuclear runaways in CO WDs (Zhu et al. in prep.).
+[CZERNY](https://en.wikipedia.org/wiki/Carl_Czerny) is a Python-based hydrostatic spherical white dwarf (WD) integrator that utilizes Timmes' [Helmholtz EOS](http://cococubed.asu.edu/code_pages/eos.shtml).  Also included is effective pressure support and convective suppression due rotation (via the Chandrasekhar approximation and Solberg-Hoiland criterion), and convective suppression due to magnetic fields (using [Gough & Tayler 1966](http://adsabs.harvard.edu/abs/1966MNRAS.133...85G)).  Prototype was used to generate initial conditions for Zhu et al. 2013 and Zhu et al. 2015.  Currently being used to investigate nuclear runaways in CO WDs (Zhu et al. in prep.).
 
 <h3>Requirements</h3>
 
