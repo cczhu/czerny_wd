@@ -4,10 +4,10 @@ from scipy.optimize import curve_fit
 import os, sys
 import copy
 
-################HYDROSTAR CLASS###############################
+################## MAGPROFILE CLASS ###############################
 
 class magprofile:
-	"""Magnetic field profiler.  Returns functions fBfld and fBderiv, which allow for 
+	"""Magnetic field profiler.  Returns functions fBfld and fBderiv, used in StarMod.maghydrostar to determine and propagate magnetic field.
 
 		Arguments:
 		radius - radius
@@ -39,7 +39,7 @@ class magprofile:
 			def fBderiv(r, m, drdm):
 				return 0.*r
 		else:
-			#Load in files
+			# Load in files
 			if filename:
 				f_in = open(filename, 'r')
 				f_in_data = np.loadtxt(f_in)
@@ -51,11 +51,11 @@ class magprofile:
 				self.Bfld = Bfld
 				self.mass = mass
 
-			#Smooth magnetic field profile, if necessary
+			# Smooth magnetic field profile, if necessary
 			if smooth:
 				self.Bfld = self.movingaverage(self.Bfld, smooth)
 
-			#Derive magnetic field function
+			# Derive magnetic field function
 			if method == "spline":
 				[self.fBfld_r, self.fBderiv_r] = self.getspline_Bfld()
 			elif method == "pwr":
@@ -69,7 +69,7 @@ class magprofile:
 				if len(testout[args] > 0):
 					print "WARNING: positive magnetic slope detected!  Minimum r with positive slope is {0:3e}".format(min(self.radius[args]))
 
-			#Derive mass function
+			# Derive mass function
 			[self.frass, self.frderiv] = self.getspline_radius()
 
 			[fBfld, fBderiv] = self.getfBfld()
@@ -82,7 +82,7 @@ class magprofile:
 
 	def getfBfld(self):
 
-		#Deepcopy these functions in case they get changed later
+		# Deepcopy these functions in case they get changed later
 		fBfld_r = copy.deepcopy(self.fBfld_r)
 		fBderiv_r = copy.deepcopy(self.fBderiv_r)
 		frass = copy.deepcopy(self.frass)
@@ -90,7 +90,7 @@ class magprofile:
 
 		max_m = self.mass[-1]
 
-		#Define field and field derivative functions
+		# Define field and field derivative functions
 		def fBfld(r, m):
 			if m >= max_m:
 				return 0.
@@ -109,10 +109,12 @@ class magprofile:
 		return [fBfld, fBderiv]
 
 
-###################################Fitting Functions#######################################
+################################### Fitting Functions #######################################
 
-	#Cubic spline interpolation of magnetic field profile
 	def getspline_Bfld(self):
+		"""Cubic spline interpolation of magnetic field profile.
+		"""
+
 		if self.radius[0]:
 			radius_ext = np.concatenate([np.array([0]), self.radius, np.array([1e12])])
 			Bfld_ext = np.concatenate([np.array([self.Bfld[0]]), self.Bfld, np.array([1e-3*min(self.Bfld)])])
@@ -124,8 +126,10 @@ class magprofile:
 		return [fBfld, fBderiv]
 
 
-	#Cubic spline interpolation of radius as a function of cumulative mass
 	def getspline_radius(self):
+		"""Cubic spline interpolation of radius as a function of cumulative mass.
+		"""
+
 		if self.radius[0]:
 #			radius_ext = np.concatenate([np.array([0]), self.radius, np.array([1e12])])
 #			mass_ext = np.concatenate([np.array([0]), self.mass, np.array([max(self.mass)])])
@@ -141,9 +145,10 @@ class magprofile:
 		return [frad, frderiv]
 
 
-	#Fits a broken power law - first the two power law sections are fit to, then the normalization and knee.  The normalization
-	#can be scaled afterward ("renorm"), but a single fit to the entire data set with curve_fit favours large values over small.
 	def getbrokenpwr(self, bpargs, renorm):
+		"""Fits a broken power law - first the two power law sections are fit to, then the normalization and knee.  The normalization can be scaled afterward ("renorm"), but a single fit to the entire data set with curve_fit favours large values over small.
+		"""
+
 		interior_limits = bpargs[0]
 		exterior_limits = bpargs[1]
 		args_int = (self.radius > interior_limits[0])*(self.radius < interior_limits[1])
@@ -153,7 +158,7 @@ class magprofile:
 		beta1 = fit_int[0]
 		beta2 = fit_ext[0]
 
-		#Yay, I get to use a closure! a = normalization, b = characteristic radius of power law knee
+		# Yay, I get to use a closure! a = normalization, b = characteristic radius of power law knee
 		def func_to_fit(x, a, b):
 			return a*((x/b)**(-2*beta1) + (x/b)**(-2*beta2))**-0.5
 
@@ -186,13 +191,12 @@ class magprofile:
 
 
 	@staticmethod
-	#Same as the moving average in Analyzer.py
 	def movingaverage(interval, window_size):
 		"""Returns the smoothed curve of interval.  Recently fixed kernel offset and edge effects with ghost cells.
 
-		smoothed = movingaverage(interval, window_size)
-			interval: set of data to be smoothed
-			window_size: number of elements to smooth over; if an even number is given, +1 is added
+		Arguments:
+		interval: set of data to be smoothed
+		window_size: number of elements to smooth over; if an even number is given, +1 is added
 		"""
 
 		ghost = int(floor(window_size/2.))

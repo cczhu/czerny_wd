@@ -54,17 +54,17 @@ class maghydrostar:
 					dontintegrate=False, verbose=False):
 
 		self.Msun = 1.9891e33
+		self.grav = 6.67384e-8
+		self.stepcoeff = 1e-2
 		self.mass_want = mass
 		self.mass_tol = mass_tol
 		self.temp_c = temp_c
-		self.grav = 6.67384e-8
 		self.nreps = nreps
-		self.stepcoeff = 1e-2
 		self.derivtype = derivtype
 		self.nablarat_crit = nablarat_crit
 		self.mintemp = mintemp
 
-		#recent additions to __init__ (formerly were just passed to getstarmodel).
+		# recent additions to __init__ (formerly were just passed to getstarmodel).
 		self.fakeouterpoint = fakeouterpoint
 		self.stop_invertererr = stop_invertererr
 		self.stop_mrat = stop_mrat
@@ -74,10 +74,10 @@ class maghydrostar:
 		self.L_want = Lwant
 		self.L_tol = L_tol
 
-		#Remember to print messages
+		# Remember to print messages
 		self.verbose = verbose
 
-		#If magprofile is false, generate a zero-field profile
+		# If magprofile is false, generate a zero-field profile
 		if not magprofile:
 			if self.verbose:
 				print "magprofile == False - will assume star has no magnetic field!"
@@ -120,15 +120,15 @@ class maghydrostar:
 			if self.verbose:
 				print "Composition set to CARBON-OXYGEN (50% mix by mass)"
 			self.abar = 13.714285714285715
-		self.zbar = self.abar/2.	#Will need changing when we start looking at weirder stars.
+		self.zbar = self.abar/2.	# Will need changing when we start looking at weirder stars.
 
-		#In the future, adapt other EOSs?
+		# In the future, adapt other EOSs?
 
-		#Run a dummy gethelmeos to check if EOS is initialized:
+		# Run a dummy gethelmeos to check if EOS is initialized:
 		pressure,energy,soundspeed,gammaout,entropy,checkeosfailure = myhmag.gethelmholtzeos(1e5,1e2,2.,4.,True)
-		if checkeosfailure:	#If 1 is returned
+		if checkeosfailure:					# If 1 is returned...
 			print "I noticed you haven't initialized helmholtz.  Doing so now."
-			myhmag.initializehelmholtz()	#Initialize helmholtz
+			myhmag.initializehelmholtz()	# ...initialize helmholtz
 
 		if self.derivtype == "simcd":
 			if magprofile:
@@ -148,7 +148,7 @@ class maghydrostar:
 			if self.verbose:
 				print "Simple (GT66/MM09) derivative selected!"
 
-		#Set temperature floor - essentially necessary since Helmholtz has a 1000 K temperature floor.
+		# Set temperature floor - essentially necessary since Helmholtz has a 1000 K temperature floor.
 		self.mintemp = mintemp
 		self.mintemp_func = self.mintemp_func_creator()		#lambda x: 1./(np.exp(-100.*(x - 1.125*self.mintemp)/self.mintemp) + 1.)	#**2
 		if self.verbose:
@@ -532,7 +532,7 @@ class maghydrostar:
 		"""Iterative solver to obtain WD with specified mass and largest possible Omega value that does not feature a density inversion due to too much rotational support.  Arguments have identical meanings as class initialization ones.
 		"""
 
-		#This code can't run if these checks aren't in place!
+		# This code can't run if these checks aren't in place!
 		if not self.stop_invertererr:
 			print "getmaxomega REQUIRES self.stop_invertererr be true!  Setting it so."
 			self.stop_invertererr = True
@@ -543,7 +543,7 @@ class maghydrostar:
 			print "getmaxomega REQUIRES self.stop_positivepgrad be true!  Setting it so."
 			self.stop_positivepgrad = True
 
-		#First, get a stationary model
+		# First, get a stationary model
 		self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
 		print "Obtained stationary solution; now let's try a rotating one"
 
@@ -565,11 +565,11 @@ class maghydrostar:
 				print "Omega estimate = {0:.3e}; dOmega = {1:.3e}; error = {2:s}".format(self.omega, omegastep, gsm_output)
 			if gsm_output == "tinystepmod_err":	# HAAAAAAAAAACK!  But it's probably a reasonable one.  Integration should be terminated, but not omega finding.
 				gsm_output = None
-			if (omegastep < 0 and gsm_output == None) or (omegastep > 0 and gsm_output != None):	#If we overstepped the critical rotation point
+			if (omegastep < 0 and gsm_output == None) or (omegastep > 0 and gsm_output != None):	# If we overstepped the critical rotation point
 				self.omega -= 0.9*omegastep
 				omegastep = omegastep*0.1
 			else:
-				self.omega += omegastep	#Otherwise keep adding
+				self.omega += omegastep	# Otherwise keep adding
 
 		if self.verbose:
 			print "Critical Omega {0:.3e} determined to accuracy of {1:.3e}".format(self.omega, omegastep, gsm_output)
@@ -584,13 +584,13 @@ class maghydrostar:
 		"""
 
 		Mdiff = M_arr[-1] - Mwant
-		if Mdiff < 0 and max(M_arr) < Mwant:	#If the current star is too light, and we've never made a heavy enough star
-			#if the global maximum isn't the most recent integration, and we're currently going toward lighter stars
+		if Mdiff < 0 and max(M_arr) < Mwant:	# If the current star is too light, and we've never made a heavy enough star
+			# If the global maximum isn't the most recent integration, and we're currently going toward lighter stars
 			if (np.argmax(M_arr) - len(M_arr) < 1) and M_arr[-1] < M_arr[-2]:
 				return "Global maximum {0:.4e} mass is still too small to satisfy Mwant {1:.4e}".format(max(M_arr), Mwant)
-		elif Mdiff > 0 and min(M_arr) > Mwant:	#If the current star is too heavy, and we've never made a light enough star
+		elif Mdiff > 0 and min(M_arr) > Mwant:	# If the current star is too heavy, and we've never made a light enough star
 			if (np.argmin(M_arr) - len(M_arr) < 1) and M_arr[-1] > M_arr[-2]:
-			#If the global minimum isn't the most recent integration, and we're currently going toward heavier stars
+			# If the global minimum isn't the most recent integration, and we're currently going toward heavier stars
 				return "Global minimum {0:.4e} mass is still too large to satisfy Mwant {1:.4e}".format(min(M_arr), Mwant)
 		else:
 			return None
@@ -616,7 +616,7 @@ class maghydrostar:
 
 ###################################### EOS STUFF #######################################
 
-	#EOS functions are passed failtrig as a list (since lists are mutable).
+	# EOS functions are passed failtrig as a list (since lists are mutable).
 	def getpress_rhoT(self, dens, temp, failtrig=[-100], togglecoulomb=True):
 		pressure,energy,soundspeed,gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(temp,dens,self.abar,self.zbar,togglecoulomb)
 		failtrig[0] = dummyfail
@@ -633,7 +633,6 @@ class maghydrostar:
 		temp,pressure,energy,soundspeed,gammaout,dummyfail = myhmag.geteosinversionsd(dens,self.abar,self.zbar,entropy,togglecoulomb)
 		failtrig[0] = dummyfail
 		return [pressure, temp]
-
 
 	def getdens_PT(self, press, temp, failtrig=[-100], togglecoulomb=True):
 		dens,energy,soundspeed,gammaout,entropy,dummyfail = myhmag.geteosinversionpt(temp,self.abar,self.zbar,press, togglecoulomb)
@@ -653,6 +652,13 @@ class maghydrostar:
 		temp,dens,energy,soundspeed,gammaout,dummyfail = myhmag.geteosinversionsp_withest(self.abar,self.zbar,dens_est,temp_est,press,entropy,True,togglecoulomb, eostol)
 		failtrig[0] = dummyfail
 		return [dens, temp, gammaout]
+
+
+	def getgamma_PD(self, dens, press, failtrig=[-100], togglecoulomb=True):
+		"""Obtains Gamma_1 = dP/drho_ad estimate for first_derivatives functions.
+		"""
+		temp_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,entropy_dummy,failtrig[0] = myhmag.geteosinversionpd(dens,self.abar,self.zbar,P,True)
+		return [Gamma1_est]
 
 
 ######################################## DERIVATIVES #######################################
@@ -794,7 +800,6 @@ class maghydrostar:
 		#magnetic gamma and gravitational terms
 		if self.simd_usegammavar:
 			press_est = press + dydx[1]*m_step
-#			temp_dummy,dens_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,failtrig[0] = myhmag.geteosinversionsp_withest(self.abar,self.zbar,dens,temp,press_est,entropy,True,True,ps_eostol)
 			[dens_dummy, temp_dummy, Gamma1_est] = self.getdens_PS_est(press_est, entropy, failtrig=failtrig, dens_est=dens, temp_est=temp, eostol=ps_eostol)	#assumes adiabatic
 			nabla_terms["dlngamdlnP"] = (press/Gamma1)*(Gamma1_est - Gamma1)/(press_est - press)	#dlngamma/dlnP = (P/gamma)*(dgamma/dP)
 			nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press)*nabla_terms["dlngamdlnP"]
