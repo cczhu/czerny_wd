@@ -11,47 +11,135 @@ import copy
 ################HYDROSTAR CLASS###############################
 
 class maghydrostar:
-	"""Magnetohydrostatic star generator.  Generates spherical WDs with adiabatic temperature profiles using the Helmholtz (http://cococubed.asu.edu/code_pages/eos.shtml) EOS.  rigid rotation spherical approximation and Gough & Tayler 66 magnetic convective suppression criterion (but no pressure term).  Includes gravitational and varying specific heat ratio terms of GT66 criterion.  All values in CGS.
+	"""
+	Magnetohydrostatic star generator.  Generates spherical WDs with 
+	adiabatic temperature profiles using the Helmholtz 
+	(http://cococubed.asu.edu/code_pages/eos.shtml) EOS, rigid rotation 
+	spherical approximation and Gough & Tayler 66 magnetic convective 
+	suppression criterion (but no pressure term).  Includes gravitational 
+	and varying specific heat ratio terms of GT66 criterion.  All values 
+	in CGS.
 
-	Arguments:
-	mass: wanted mass (g)
-	temp_c: wanted central temperature (K).  If you want to use entropy, then populate S_want (code will then ignore this value and calculate 
-			self-consistent temp_c).
-	magprofile: magnetic profile object.  Defaults to false, meaning no magnetic field.  If derivtype="sim", a magf object containing the field should be passed.
-				if derivtype="simcd", magprofile should equal delta = B^2/(B^2 + 4pi*Gamma1*Pgas).
-	omega: rigid rotation angular velocity (rad/s).  Defaults to 0 (non-rotating).  If < 0, attempts to estimate break-up omega with 
-			self.getomegamax(), if >= 0, uses user defined value.
-	S_want: use a user-specified central entropy (erg/K) INSTEAD OF temperature temp_c.
-	mintemp: temperature floor (K), effectively switches from adiabatic to isothermal profile if reached
-	mass_tol: fractional tolerance between mass wanted and mass produced by self.getstarmodel()
-	composition: "CO", "Mg" or "He" composition
-	derivtype: derivative function used - either "sim" (default) or "simcd" (assumes constant magnetic delta = B^2/(B^2 + 4pi*Gamma1*Pgas)).
-	simd_userot: use Solberg-Hoiland deviation from adiabatic temperature gradient
-	simd_usegammavar: use gamma = c_P/c_V index magnetic deviation from adiabatic temperature gradient
-	simd_usegrav: use gravity magnetic devation from adiabatic temperature gradient
-	simd_suppress: suppresses deviations from adiabaticity in first step of integration
-	nablarat_crit: software crash toggle if nabla ever becomes too large - only useful for developmental purposes!
-	P_end_ratio: ratio of P/P_c at which to terminate stellar integration
-	ps_eostol: tolerance ONLY IN myhmag.geteosinversionsp_withest RIGHT NOW (when inverting Helmholtz EOS to find density/temperature from pressure/entropy)
-	fakeouterpoint: add additional point to profile where M = mass_want to prevent interpolation attempts from failing
-	stop_invertererr: stop when EOS error is reached
-	stop_mrat: stop when integrated M is larger than stop_mrat*mass
-	stop_positivepgrad: stop when dP/dr becomes positive
-	densest: central density initial estimate for self.getstarmodel()
-	omegaest: estimate of rigid rotating angular speed.  Default is False - code wil then use 0.75*mystar.L_want/I.
-	omega_crit_tol: when using the self.getomegamax() iterative finder, absolute error tolerance for maximum omega
-	nreps: max number of attempts to find a star in self.getstarmodel().
-	stopcount_max: when self.getstarmodel() detects that wanted mass and temp_c/S_want combination may not be achievable, number of stellar
-					integration iterations to take before testing for global extrema
-	dontintegrate: set up the problem, but don't shoot for a star
-	verbose: report happenings within code
+	Parameters
+	----------
+	mass : wanted mass (g)
+	temp_c : wanted central temperature (K).  If you want to use entropy, 
+		then populate S_want (code will then ignore this value and 
+		calculate self-consistent temp_c).
+	magprofile : magnetic profile object.  Defaults to false, meaning no 
+		magnetic field.  If derivtype="sim", a magf object containing the 
+		field should be passed.  If derivtype="simcd", magprofile should 
+		equal delta = B^2/(B^2 + 4pi*Gamma1*Pgas).
+	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
+		rotating).  If < 0, attempts to estimate break-up omega with 
+		self.getomegamax(), if >= 0, uses user defined value.
+	S_want : use a user-specified central entropy (erg/K) INSTEAD OF 
+		temperature temp_c.
+	mintemp : temperature floor (K), effectively switches from adiabatic 
+		to isothermal profile if reached.
+	mass_tol : fractional tolerance between mass wanted and mass produced 
+		by self.getstarmodel()
+	composition : "CO", "Mg" or "He" composition.
+	derivtype : derivative function used - either "sim" (default) or "simcd" 
+		(assumes constant magnetic delta = B^2/(B^2 + 4pi*Gamma1*Pgas)).
+	simd_userot : use Solberg-Hoiland deviation from adiabatic temperature 
+		gradient.
+	simd_usegammavar : use gamma = c_P/c_V index magnetic deviation from 
+		adiabatic temperature gradient.
+	simd_usegrav : use gravity magnetic devation from adiabatic temperature 
+		gradient.
+	simd_suppress : suppresses deviations from adiabaticity in first step of 
+		integration.
+	nablarat_crit : software crash toggle if nabla ever becomes too 
+		large - only useful for developmental purposes!
+	P_end_ratio : ratio of P/P_c at which to terminate stellar integration.
+	ps_eostol : tolerance ONLY IN myhmag.geteosinversionsp_withest RIGHT NOW 
+		(when inverting Helmholtz EOS to find density/temperature from 
+		pressure/entropy).
+	fakeouterpoint : add additional point to profile where M = mass_want to 
+		prevent interpolation attempts from failing.
+	stop_invertererr : stop integrating when EOS error is reached.
+	stop_mrat : stop integrating when integrated M is larger than 
+		stop_mrat*mass.
+	stop_positivepgrad : stop integrating when dP/dr becomes positive.
+	stop_mindenserr : density floor, below which integration is halted.
+		Default is set to 1e-10 to prevent it from ever being reached.  
+		Helmholtz sometimes has trouble below this 1e-8; try adjusting this
+		value to eliminate inverter errors.
+	densest : central density initial estimate for self.getstarmodel().
+	omegaest : estimate of rigid rotating angular speed.  Default is False
+		- code wil then use 0.75*mystar.L_want/I.
+	omega_crit_tol : when using the self.getomegamax() iterative finder, 
+		absolute error tolerance for maximum omega.
+	nreps : max number of attempts to find a star in self.getstarmodel().
+	stopcount_max : when self.getstarmodel() detects that wanted mass and 
+					temp_c/S_want combination may not be achievable, number 
+					of stellar integration iterations to take before 
+					testing for global extrema.
+	dontintegrate : set up the problem, but don't shoot for a star.
+	verbose : report happenings within code.
+
+	Returns
+	-------
+	mystar : maghydrostar class instance
+		If star was integrated and data written, results can be found in
+		mystar.data.  Further analysis can be performed with 
+		mystar.getenergies,	mystar.getgradients and mystar.getconvection.
+
+
+	Notes
+	-----
+	Additional documentation can be found for specific functions within the
+	class.  The default behaviour of maghydrostar is to shoot for either a 
+	user-specified mass or both a mass and an angular momentum.  It is possible
+	to define an instance of maghydrostar and then use integrate_star to
+	produce profiles of a known density, central temperature/entropy, and
+	spin angular velocity Omega.  Be warned, however, that many of the 
+	integration parameters, including the value of the temperature floor, the
+	types of superadiabatic temperature gradient deviations used, and the 
+	pressure and density at which to halt integration.  MAKE SURE these are set 
+	when the class instance is declared!  See Examples, below.		
+
+
+	Examples
+	--------
+	To build a 1.2 Msun star with solid body rotation Omega = 0.3 s^-1:
+	>>> import StarMod as Star
+	>>> mystar = Star.maghydrostar(1.2*1.9891e33, 5e6, False, 
+	>>>		omega=0.3, simd_userot=True, verbose=True)
+	The stellar profile can be found under mystar.data, and plotted.  
+	For exmaple:
+	>>> import matplotlib.pyplot as plt
+	>>> plt.plot(mystar.data["R"], mystar.data["rho"], 'r-')
+	>>> plt.xlabel("r (cm)")
+	>>> plt.ylabel(r"$\rho$ (g/cm$^3$)")
+	To generate a series of adiabatic non-rotating WD profiles with 
+	increasing density, we can use maghydrostar's methods:
+	>>> import StarMod as Star
+	>>> import numpy as np
+	>>> import copy
+	>>> dens_c = 10.**np.arange(8,9,0.1)
+	>>> out_dict = {"dens_c": dens_c,
+	>>>     "M": np.zeros(len(dens_c)),
+	>>>     "stars": []}
+	>>> mystar = Star.maghydrostar(False, False, False, simd_userot=True, 
+	>>>				verbose=True, stop_mrat=False, dontintegrate=True)
+	>>> for i in range(len(dens_c)):
+	>>>     [Mtot, outerr_code] = mystar.integrate_star(dens_c[i], 5e6, 0.0, 
+	>>>					recordstar=True, outputerr=True)
+	>>>     out_dict["M"][i] = Mtot
+	>>>     out_dict["stars"].append(copy.deepcopy(mystar.data))
 	"""
 
-	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., S_want=False, mintemp=1e4, composition="CO", derivtype="sim",
-					simd_userot=True, simd_usegammavar=False, simd_usegrav=False, simd_suppress=False, nablarat_crit=False, 
-					P_end_ratio=1e-8, ps_eostol=1e-8, fakeouterpoint=False, stop_invertererr=True, stop_mrat=2., stop_positivepgrad=True,
-					densest=False, omegaest=False, mass_tol=1e-6, L_tol=1e-2, omega_crit_tol=1e-2, nreps=30, stopcount_max=5, 
-					dontintegrate=False, verbose=False):
+	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
+				S_want=False, mintemp=1e4, composition="CO", derivtype="sim",
+				simd_userot=True, simd_usegammavar=False, simd_usegrav=False, 
+				simd_suppress=False, nablarat_crit=False, P_end_ratio=1e-8, 
+				ps_eostol=1e-8, fakeouterpoint=False, stop_invertererr=True, 
+				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
+				densest=False, omegaest=False, mass_tol=1e-6, L_tol=1e-2, 
+				omega_crit_tol=1e-2, nreps=30, stopcount_max=5, 
+				dontintegrate=False, verbose=False):
 
 		self.Msun = 1.9891e33
 		self.grav = 6.67384e-8
@@ -69,6 +157,8 @@ class maghydrostar:
 		self.stop_invertererr = stop_invertererr
 		self.stop_mrat = stop_mrat
 		self.stop_positivepgrad = stop_positivepgrad
+		self.stop_mindenserr = stop_mindenserr
+		self.s_mind_errcode = False	# If True, returns mindenserr as an outerr_code (usually unwanted behaviour)
 		self.stopcount_max = stopcount_max
 		self.omega_crit_tol = omega_crit_tol
 		self.L_want = Lwant
@@ -171,12 +261,18 @@ class maghydrostar:
 ######################################### SHOOTING ALGORITHMS #########################################
 
 	def getstarmodel(self, densest=False, omega_user=-1, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, deltastepcoeff=0.1, out_search=False):
-		"""Newton-Raphson solver to obtain WD with user-specified mass.  Arguments not listed below have identical meanings as class initialization ones.
+		"""
+		Newton-Raphson solver to obtain WD with user-specified mass.  Arguments not listed 
+		below have identical meanings as class initialization ones.
 
-		Arguments:
-		omega_user: use omega_user instead of self.omega in integrate_star.  Defaults to -1 (meaning "DO NOT USE") - code then uses self.omega.
-		deltastepcoeff: when estimating the Jacobian, Delta rho = deltastepcoeff*abs(deltadens_previous).  Defaults to 0.1.
-		out_search: prints the rho and corresponding M values calculated by integrate_star during the shooting process
+		Parameters
+		----------
+		omega_user : use omega_user instead of self.omega in integrate_star.  
+			Defaults to -1 (meaning "DO NOT USE") - code then uses self.omega.
+		deltastepcoeff : when estimating the Jacobian, Delta rho = 
+			deltastepcoeff*abs(deltadens_previous).  Defaults to 0.1.
+		out_search : prints the rho and corresponding M values calculated by 
+			integrate_star during the shooting process
 		"""
 
 		if not densest:
@@ -291,14 +387,24 @@ class maghydrostar:
 
 	def getrotatingstarmodel(self, densest=False, omegaest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, damp_nrstep=1, deltastepcoeff=0.05, 
 									interior_dscoeff=0.1, omega_warn=10., out_search=False):
-		"""Newton-Raphson solver to obtain rigidly-rotating WD with user-specified mass and ANGULAR MOMENTUM.  If you wish to create a WD with user-specified mass and omega, use self.getstarmodel().  Arguments not defined below have identical meanings as class initialization ones.
+		"""
+		Newton-Raphson solver to obtain rigidly-rotating WD with user-specified mass and 
+		ANGULAR MOMENTUM.  If you wish to create a WD with user-specified mass and omega, 
+		use self.getstarmodel().  Arguments not defined below have identical meanings as 
+		class initialization ones.
 
-		Arguments:
-		damp_nrstep: damping term for Newton-Raphson stepping.  Defaults to 1, but that will likely lead to overshooting near critical Omega values.
-		deltastepcoeff: when estimating the Jacobian, Delta Omega = deltastepcoeff*abs(deltaOmega_previous).  Defaults to 0.05.
-		interior_dscoeff: deltastepcoeff for getstarmodel mass-finding sub-loops.  Defaults to 0.1.
-		omega_warn: stop integration if self.omega approaches omega_warn*omega_crit estimate.  Defaults to 10 to prevent premature stoppage.
-		out_search: prints L, omega calculated by integrate_star during the shooting process
+		Parameters
+		----------
+		damp_nrstep : damping term for Newton-Raphson stepping.  Defaults to 1, 
+			but that will likely lead to overshooting near critical Omega values.
+		deltastepcoeff: when estimating the Jacobian, Delta Omega = 
+			deltastepcoeff*abs(deltaOmega_previous).  Defaults to 0.05.
+		interior_dscoeff: deltastepcoeff for getstarmodel mass-finding sub-loops.  
+			Defaults to 0.1.
+		omega_warn: stop integration if self.omega approaches omega_warn*omega_crit 
+			estimate.  Defaults to 10 to prevent premature stoppage.
+		out_search: prints L, omega calculated by integrate_star during the 
+			shooting process.
 		"""
 
 		if self.L_want <= 0.:
@@ -529,7 +635,8 @@ class maghydrostar:
 ############################# UNCOMMENT IF YOU WANT TO USE 2D JACOBIAN (I HAVEN'T FOUND IT TO BE FASTER #################################
 
 	def getmaxomega(self, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, out_search=False):
-		"""Iterative solver to obtain WD with specified mass and largest possible Omega value that does not feature a density inversion due to too much rotational support.  Arguments have identical meanings as class initialization ones.
+		"""
+		Iterative solver to obtain WD with specified mass and largest possible Omega value that does not feature a density inversion due to too much rotational support.  Arguments have identical meanings as class initialization ones.
 		"""
 
 		# This code can't run if these checks aren't in place!
@@ -572,7 +679,7 @@ class maghydrostar:
 				self.omega += omegastep	# Otherwise keep adding
 
 		if self.verbose:
-			print "Critical Omega {0:.3e} determined to accuracy of {1:.3e}".format(self.omega, omegastep, gsm_output)
+			print "Critical Omega {0:.3e} determined to accuracy of {1:.3e}; error {2}".format(self.omega, 10.*omegastep, gsm_output)
 			
 		if i == self.nreps:
 			print "WARNING, maximum number of shooting attempts {0:d} reached!".format(i)
@@ -618,48 +725,50 @@ class maghydrostar:
 
 	# EOS functions are passed failtrig as a list (since lists are mutable).
 	def getpress_rhoT(self, dens, temp, failtrig=[-100], togglecoulomb=True):
-		pressure,energy,soundspeed,gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(temp,dens,self.abar,self.zbar,togglecoulomb)
-		failtrig[0] = dummyfail
+		pressure,energy,soundspeed,gammaout,entropy,failtrig[0] = myhmag.gethelmholtzeos(temp,dens,self.abar,self.zbar,togglecoulomb)
 		return [pressure, entropy]
 
 
 	def geteosgradients(self, dens, temp, Pchi, failtrig=[-100], togglecoulomb=True):
-		adgradred,hydrograd,nu,alpha,delta,Gamma1,cP,cPhydro,dummyfail = myhmag.gethelmgrads(temp,dens,Pchi,self.abar,self.zbar,togglecoulomb)
-		failtrig[0] = dummyfail
+		adgradred,hydrograd,nu,alpha,delta,Gamma1,cP,cPhydro,failtrig[0] = myhmag.gethelmgrads(temp,dens,Pchi,self.abar,self.zbar,togglecoulomb)
 		return [adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro]
 
 
 	def getpress_rhoS(self, dens, entropy, failtrig=[-100], togglecoulomb=True):
-		temp,pressure,energy,soundspeed,gammaout,dummyfail = myhmag.geteosinversionsd(dens,self.abar,self.zbar,entropy,togglecoulomb)
-		failtrig[0] = dummyfail
+		temp,pressure,energy,soundspeed,gammaout,failtrig[0] = myhmag.geteosinversionsd(dens,self.abar,self.zbar,entropy,togglecoulomb)
 		return [pressure, temp]
 
 	def getdens_PT(self, press, temp, failtrig=[-100], togglecoulomb=True):
-		dens,energy,soundspeed,gammaout,entropy,dummyfail = myhmag.geteosinversionpt(temp,self.abar,self.zbar,press, togglecoulomb)
-		failtrig[0] = dummyfail
+		dens,energy,soundspeed,gammaout,entropy,failtrig[0] = myhmag.geteosinversionpt(temp,self.abar,self.zbar,press, togglecoulomb)
 		return [dens, entropy]
 
 
 	def getdens_PS(self, press, entropy, failtrig=[-100], togglecoulomb=True):
-		temp,dens,energy,soundspeed,gammaout,dummyfail = myhmag.geteosinversionsp(self.abar,self.zbar,press,entropy,True,togglecoulomb)
-		failtrig[0] = dummyfail
+		temp,dens,energy,soundspeed,gammaout,failtrig[0] = myhmag.geteosinversionsp(self.abar,self.zbar,press,entropy,True,togglecoulomb)
 		return [dens, temp]
 
 
 	def getdens_PS_est(self, press, entropy, failtrig=[-100], dens_est=1e6, temp_est=1e7, togglecoulomb=True, eostol=1e-8):
 		"""Identical to getdens_PS, but uses user-defined estimates to help with the Newton-Raphson algorithm.
 		"""
-		temp,dens,energy,soundspeed,gammaout,dummyfail = myhmag.geteosinversionsp_withest(self.abar,self.zbar,dens_est,temp_est,press,entropy,True,togglecoulomb, eostol)
-		failtrig[0] = dummyfail
+		temp,dens,energy,soundspeed,gammaout,failtrig[0] = myhmag.geteosinversionsp_withest(self.abar,self.zbar,dens_est,temp_est,press,entropy,True,togglecoulomb, eostol)
 		return [dens, temp, gammaout]
 
 
 	def getgamma_PD(self, dens, press, failtrig=[-100], togglecoulomb=True):
 		"""Obtains Gamma_1 = dP/drho_ad estimate for first_derivatives functions.
 		"""
-		temp_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,entropy_dummy,failtrig[0] = myhmag.geteosinversionpd(dens,self.abar,self.zbar,P,True)
-		return [Gamma1_est]
+		temp_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,entropy_dummy,failtrig[0] = myhmag.geteosinversionpd(dens,self.abar,self.zbar,P,togglecoulomb)
+		return Gamma1_est
 
+	def gethelmeos_energies(self, dens, temp, failtrig=[-100], togglecoulomb=True):
+		"""Obtains Gamma_1 = dP/drho_ad estimate for first_derivatives functions.
+		"""
+		press_dumm,e_int,c_s,gamma_dumm,ent_dumm,dummyfail1 = myhmag.gethelmholtzeos(temp,dens,self.abar,self.zbar,togglecoulomb)
+		press_dumm,e_deg,sound_dumm,gamma_dumm,ent_dumm,dummyfail2 = myhmag.gethelmholtzeos(1000.,dens,self.abar,self.zbar,togglecoulomb)
+		if dummyfail1 or dummyfail2:
+			failtrig[0] = 1
+		return [e_int, e_deg, c_s]
 
 ######################################## DERIVATIVES #######################################
 
@@ -745,7 +854,8 @@ class maghydrostar:
 		#magnetic field gamma and gravitational terms
 		if self.simd_usegammavar:
 			if Tc > self.mintemp and not self.simd_suppress:
-				temp_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,entropy_dummy,failtrig[0] = myhmag.geteosinversionpd(dens,self.abar,self.zbar,P,True)
+#				temp_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,entropy_dummy,failtrig[0] = myhmag.geteosinversionpd(dens,self.abar,self.zbar,P,True)
+				Gamma1_est = self.getgamma_PD(dens, P, failtrig=failtrig, togglecoulomb=True)
 				nabla_terms["dlngamdlnP"] = (Pc/Gamma1)*(Gamma1_est - Gamma1)/(P - Pc)		#dlngamma/dlnP = (P/gamma)*(dgamma/dP)
 				nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*Pc)*nabla_terms["dlngamdlnP"]
 				deviation += nabla_terms["nd_gamma"]
@@ -846,7 +956,8 @@ class maghydrostar:
 		#magnetic field gamma and gravitational terms
 		if self.simd_usegammavar:
 			if Tc > self.mintemp and not self.simd_suppress:
-				temp_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,entropy_dummy,failtrig[0] = myhmag.geteosinversionpd(dens,self.abar,self.zbar,P,True)
+#				temp_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,entropy_dummy,failtrig[0] = myhmag.geteosinversionpd(dens,self.abar,self.zbar,P,True)
+				Gamma1_est = self.getgamma_PD(dens, P, failtrig=failtrig, togglecoulomb=True)
 				nabla_terms["dlngamdlnP"] = (Pc/Gamma1)*(Gamma1_est - Gamma1)/(P - Pc)		#dlngamma/dlnP = (P/gamma)*(dgamma/dP)
 				nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*Pc)*nabla_terms["dlngamdlnP"]
 				deviation += nabla_terms["nd_gamma"]
@@ -880,13 +991,17 @@ class maghydrostar:
 
 
 	def integrate_star(self, dens_c, temp_c, omega, recordstar=False, P_end_ratio=1e-8, ps_eostol=1e-8, outputerr=False):
-		"""ODE solver that generates stellar profile given a central density dens_c, central temperature temp_c, and solid-body angular speed omega.  All arguments not listed below are same as in __init__().
+		"""
+		ODE solver that generates stellar profile given a central density dens_c, central 
+		temperature temp_c, and solid-body angular speed omega.  All arguments not listed 
+		below are same as in __init__().
 
-		Arguments:
-		dens_c: central density (g/cm^3)
-		temp_c: central temperature (K)
-		omega: solid-body angular speed (rad/s)
-		outputerr: output any error codes received from integrator
+		Parameters
+		----------
+		dens_c : central density (g/cm^3)
+		temp_c : central temperature (K)
+		omega : solid-body angular speed (rad/s)
+		outputerr : output any error codes received from integrator
 		"""
 
 		stepsize = max(self.mass_want,0.4*self.Msun)*0.01*min(self.mass_tol, 1e-6)	# Found out the hard way that if you use simd_usegammavar, having a large mass_tol can cause errors
@@ -921,7 +1036,7 @@ class maghydrostar:
 		# Take one step forward (we know the central values, and we assume dP_chi/dr = 0), assuming the central density does not change significantly
 		M = stepsize
 		R, P, temp, Bfld, Pmag, hydrograd, totalgrad, nabla_terms = self.first_deriv(dens, M, Pc, temp, omega, failtrig=errtrig)
-		[dens, entropy] = self.getdens_PT(P, temp)
+		[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
 
 		# If the inversion (will only be used if simd_usegammavar is active) in very first step fails, throw up an error and quit
 		if errtrig[0]:
@@ -944,6 +1059,8 @@ class maghydrostar:
 			self.data["nabla_mhdr"].append(totalgrad)
 			self.data["nabla_terms"].append(nabla_terms)
 
+		f = open("jesuslives.txt", 'w')
+
 		# Continue stepping using scipy.integrate.odeint
 		while P > Pend:
 
@@ -965,7 +1082,7 @@ class maghydrostar:
 
 			M += stepsize
 
-			[dens, entropy] = self.getdens_PT(P, temp)
+			[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
 
 			if recordstar:
 				self.data["M"].append(M)
@@ -992,6 +1109,13 @@ class maghydrostar:
 				outerr_code = "hugemass_err"
 				print "M is huge!"
 				break
+			if self.stop_mindenserr and (abs(dens) < self.stop_mindenserr):
+				if self.s_mind_errcode:
+					outerr_code = "mindens_err"
+				print "Density is below {0:e}!  Writing last data-point and stopping integration.".format(self.stop_mindenserr)
+				break
+
+		f.close()
 
 		# Step outward one last time
 		y_in = np.array([R, P, temp])
@@ -1102,8 +1226,9 @@ class maghydrostar:
 		self.data["edeg"] = np.zeros(len(self.data["rho"]))
 		self.data["c_s"] = np.zeros(len(self.data["rho"]))
 		for i in range(len(self.data["rho"])):
-			pressure,self.data["eint"][i],self.data["c_s"][i],gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(self.data["T"][i],self.data["rho"][i],self.abar,self.zbar,togglecoulomb)
-			pressure,self.data["edeg"][i],soundspeed,gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(1000.,self.data["rho"][i],self.abar,self.zbar,togglecoulomb)
+#			pressure,self.data["eint"][i],self.data["c_s"][i],gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(self.data["T"][i],self.data["rho"][i],self.abar,self.zbar,togglecoulomb)
+#			pressure,self.data["edeg"][i],soundspeed,gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(1000.,self.data["rho"][i],self.abar,self.zbar,togglecoulomb)
+			[self.data["eint"][i], self.data["edeg"][i], self.data["c_s"][i]] = self.gethelmeos_energies(self.data["rho"][i], self.data["T"][i], togglecoulomb=togglecoulomb)
 		self.data["eth"] = self.data["eint"] - self.data["edeg"]
 		self.data["erot"] = (2./3.)*self.data["R"]**2*self.omega**2		#specific rotational energy I*omega^2/m = 2/3*r^2*omega^2
 
@@ -1179,7 +1304,7 @@ class maghydrostar:
 		self.data["Fconv"] = self.data["Lconv"]/4./np.pi/R**2
 		self.data["vconv"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_P"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
 		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
-		self.data["vnuc"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_P"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	#Equivalent convective velocity of entire nuclear luminosity carried away by convection
+		self.data["vnuc"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_P"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
 
 
@@ -1192,9 +1317,9 @@ class maghydrostar:
 
 		self.data["tau_cc"] = self.data["cP"]*self.data["T"]/self.data["eps_nuc"]								# Nuclear burning timescale
 		self.data["t_blob"] = scipyinteg.cumtrapz(1./self.data["vconv"], x=self.data["R"], initial=0.)			# Blob travel time from r = 0 to r = R_WD
-		self.data["t_heat_cum"] = scipyinteg.cumtrapz(4.*np.pi*self.data["R"]**2*self.data["rho"]*self.data["cP"]*self.data["T"], x=self.data["R"], initial=0.)/self.data["Lnuc"]							# Cumulative convective heating time (from CWvK unpublished Eqn. 8)
+		self.data["t_heat_cum"] = scipyinteg.cumtrapz(4.*np.pi*self.data["R"]**2*self.data["rho"]*self.data["cP"]*self.data["T"], x=self.data["R"], initial=0.)/self.data["Lnuc"]		# Cumulative convective heating time (from CWvK unpublished Eqn. 8)
 		self.data["t_heat_cum"][0] = 0.		# remove the NaN
-		self.data["t_dyn"] = scipyinteg.cumtrapz(1./self.data["c_s"], x=self.data["R"], initial=0.)	#Sound crossing (dynamical) time
+		self.data["t_dyn"] = scipyinteg.cumtrapz(1./self.data["c_s"], x=self.data["R"], initial=0.)	# Sound crossing (dynamical) time
 		self.data["t_heat"] = max(self.data["t_heat_cum"])					# Convective heating time for entire star
 		i = min((self.data["Lnuc"]/max(self.data["Lnuc"]) > 0.95).nonzero()[0])
 		self.data["R_nuc"] = self.data["R"][i]							# Outer boundary of nuclear burning region
