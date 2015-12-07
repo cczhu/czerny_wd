@@ -99,7 +99,7 @@ class maghydrostar:
 	types of superadiabatic temperature gradient deviations used, and the 
 	pressure and density at which to halt integration.  MAKE SURE these are set 
 	when the class instance is declared!  See Examples, below.		
-
+blabhlabh
 
 	Examples
 	--------
