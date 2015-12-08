@@ -33,22 +33,22 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	deltastepcoeff_omega = 0.1
 	damp_nrstep = 0.25
 	
-	if r_in.has_key("L_original"):
-		outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
-													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
-													omega_warn=1.)
-		if outerr_code:
-			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH 0.5*OMEGA ---------------"
-			outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=0.5*omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
-													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
-													omega_warn=1.)
 #	if r_in.has_key("L_original"):
-#		outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
-#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+#		outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
+#													omega_warn=1.)
 #		if outerr_code:
-#			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH A LOWER OMEGA AND TIGHTER STEPPING---------------"
-#			outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
-#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+#			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH 0.5*OMEGA ---------------"
+#			outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=0.5*omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
+#													omega_warn=1.)
+	if r_in.has_key("L_original"):
+		outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+		if outerr_code:
+			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH A LOWER OMEGA AND TIGHTER STEPPING---------------"
+			outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
 	else:
 		outerr_code = mystar.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
 										deltastepcoeff=deltastepcoeff_rho)

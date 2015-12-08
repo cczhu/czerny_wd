@@ -99,7 +99,7 @@ class maghydrostar:
 	types of superadiabatic temperature gradient deviations used, and the 
 	pressure and density at which to halt integration.  MAKE SURE these are set 
 	when the class instance is declared!  See Examples, below.		
-
+blabhlabh
 
 	Examples
 	--------
@@ -137,9 +137,9 @@ class maghydrostar:
 				simd_suppress=False, nablarat_crit=False, P_end_ratio=1e-8, 
 				ps_eostol=1e-8, fakeouterpoint=False, stop_invertererr=True, 
 				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
-				densest=False, omegaest=False, mass_tol=1e-6, L_tol=1e-6, 
-				omega_crit_tol=1e-3, nreps=30, stopcount_max=5, 
-				dontintegrate=False, verbose=True):
+				densest=False, omegaest=False, mass_tol=1e-6, L_tol=1e-2, 
+				omega_crit_tol=1e-2, nreps=30, stopcount_max=5, 
+				dontintegrate=False, verbose=False):
 
 		self.Msun = 1.9891e33
 		self.grav = 6.67384e-8
@@ -150,6 +150,7 @@ class maghydrostar:
 		self.nreps = nreps
 		self.derivtype = derivtype
 		self.nablarat_crit = nablarat_crit
+		self.mintemp = mintemp
 
 		# recent additions to __init__ (formerly were just passed to getstarmodel).
 		self.fakeouterpoint = fakeouterpoint
@@ -173,11 +174,6 @@ class maghydrostar:
 			self.magf = magprof.magprofile(None, None, None, blankfunc=True)
 		else:
 			self.magf = magprofile
-
-		self.mintemp = mintemp
-		self.mintemp_reltol = 1e-6
-		if self.verbose:
-			print "Minimum temperature set to {0:.3e}".format(self.mintemp)
 
 		self.simd_userot = simd_userot
 		self.simd_usegammavar = simd_usegammavar
@@ -243,7 +239,10 @@ class maghydrostar:
 				print "Simple (GT66/MM09) derivative selected!"
 
 		# Set temperature floor - essentially necessary since Helmholtz has a 1000 K temperature floor.
-#		self.mintemp_func = self.mintemp_func_creator()		#lambda x: 1./(np.exp(-100.*(x - 1.125*self.mintemp)/self.mintemp) + 1.)	#**2
+		self.mintemp = mintemp
+		self.mintemp_func = self.mintemp_func_creator()		#lambda x: 1./(np.exp(-100.*(x - 1.125*self.mintemp)/self.mintemp) + 1.)	#**2
+		if self.verbose:
+			print "Minimum temperature set to {0:.3e}".format(self.mintemp)
 
 		self.data = {}
 		if dontintegrate:
@@ -493,154 +492,145 @@ class maghydrostar:
 
 ############################# UNCOMMENT IF YOU WANT TO USE 2D JACOBIAN (I HAVEN'T FOUND IT TO BE FASTER #################################
 
-	def getrotatingstarmodel_2d(self, densest=False, omegaest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, damp_nrstep=1, deltastepcoeff=0.05, 
-									omega_warn=10., out_search=False):
-		"""Experimental 2D Newton-Raphson solver to obtain rigidly-rotating WD 
-		with user-specified mass and ANGULAR MOMENTUM.  If you wish to create a 
-		WD with user-specified mass and omega, use self.getstarmodel().  
-		Arguments not defined below have identical meanings as class 
-		initialization ones.
+#	def getrotatingstarmodel_2d(self, densest=False, omegaest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, damp_nrstep=1, deltastepcoeff=0.05, 
+#									omega_warn=10., out_search=False):
+#		"""Experimental 2D Newton-Raphson solver to obtain rigidly-rotating WD with user-specified mass and ANGULAR MOMENTUM.  If you wish to create a WD with user-specified mass and omega, use self.getstarmodel().  Arguments not defined below have identical meanings as class initialization ones.
 
-		Parameters
-		----------
-		omegaest : estimate of rigid rotating angular speed; by default, 
-			uses 0.75*self.L_want/I
-		deltastepcoeff : when estimating the Jacobian, Delta 
-			rho = deltastepcoeff*abs(deltadens_previous).  Defaults to 0.1.
-		omega_warn : stop integration if self.omega approaches 
-			omega_warn*omega_crit estimate
-		out_search : prints shot_arr = {M_c, dens_c, L, omega} calculated 
-			by integrate_star during the shooting process
-		"""
+#		Arguments:
+#		omegaest: estimate of rigid rotating angular speed; by default, uses 0.75*self.L_want/I
+#		deltastepcoeff: when estimating the Jacobian, Delta rho = deltastepcoeff*abs(deltadens_previous).  Defaults to 0.1.
+#		omega_warn: stop integration if self.omega approaches omega_warn*omega_crit estimate
+#		out_search: prints shot_arr = {M_c, dens_c, L, omega} calculated by integrate_star during the shooting process
+#		"""
 
-		if self.L_want <= 0. or omegaest < 0.:
-			print "DO NOT USE THIS FUNCTION IF OMEGA/ANGULAR MOMENTUM LWANT IS SUPPOSED TO BE ZERO!  THE SOLVER WON'T FORCE THE FINAL SOLUTION TO MAINTAIN OMEGA = 0."
-			return
+#		if self.L_want <= 0. or omegaest < 0.:
+#			print "DO NOT USE THIS FUNCTION IF OMEGA/ANGULAR MOMENTUM LWANT IS SUPPOSED TO BE ZERO!  THE SOLVER WON'T FORCE THE FINAL SOLUTION TO MAINTAIN OMEGA = 0."
+#			return
 
-		if not densest:
-			densest = 3.*3.73330253e-60*self.mass_want**2	# The 3. is recently added to reduce the time for integrating massive WDs from scratch
+#		if not densest:
+#			densest = 3.*3.73330253e-60*self.mass_want**2	# The 3. is recently added to reduce the time for integrating massive WDs from scratch
 
-		# If we want a specific central entropy rather than temperature
-		if S_want:
-			[pressure_dummy, self.temp_c] = self.getpress_rhoS(densest, S_want)
+#		# If we want a specific central entropy rather than temperature
+#		if S_want:
+#			[pressure_dummy, self.temp_c] = self.getpress_rhoS(densest, S_want)
 
-		# If user doesn't specify, randomly pick a relatively safe omega
-		if omegaest:
-			self.omega = omegaest
-		else:
-			self.omega = 0.2
+#		# If user doesn't specify, randomly pick a relatively safe omega
+#		if omegaest:
+#			self.omega = omegaest
+#		else:
+#			self.omega = 0.2
 
-		i = 0
-		[Mtot, outerr_code] = self.integrate_star(densest, self.temp_c, self.omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True, recordstar=True)	# First shot
-		Ltot = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*self.omega
+#		i = 0
+#		[Mtot, outerr_code] = self.integrate_star(densest, self.temp_c, self.omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True, recordstar=True)	# First shot
+#		Ltot = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*self.omega
 
-		# If we incur hugemass_err the first time
-		if outerr_code == "hugemass_err":
-			if self.verbose:
-				print "hugemass_err is huge from the first estimate.  Let's try a much lower density."
-			densest = 0.1*densest
-			[Mtot, outerr_code] = self.integrate_star(densest, self.temp_c, self.omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True, recordstar=True)
-			if outerr_code:
-				print "OUTERR_CODE {0:s}!  EXITING FUNCTION!".format(outerr_code)	# If we incur any error (or hugemass_err again)
-				return outerr_code
+#		# If we incur hugemass_err the first time
+#		if outerr_code == "hugemass_err":
+#			if self.verbose:
+#				print "hugemass_err is huge from the first estimate.  Let's try a much lower density."
+#			densest = 0.1*densest
+#			[Mtot, outerr_code] = self.integrate_star(densest, self.temp_c, self.omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True, recordstar=True)
+#			if outerr_code:
+#				print "OUTERR_CODE {0:s}!  EXITING FUNCTION!".format(outerr_code)	# If we incur any error (or hugemass_err again)
+#				return outerr_code
 
-		if self.verbose:
-			print "First shot: M = {0:.6e} (vs. M_want = {1:.6e}; relative err. {2:.6e}), L = {3:.6e} (vs. L_want = {4:.6e}; relative err. {5:.6e}) ".format( \
-															Mtot, self.mass_want, abs(Mtot - self.mass_want)/self.mass_want, Ltot, 
-															self.L_want, abs(Ltot - self.L_want)/self.L_want)
+#		if self.verbose:
+#			print "First shot: M = {0:.6e} (vs. M_want = {1:.6e}; relative err. {2:.6e}), L = {3:.6e} (vs. L_want = {4:.6e}; relative err. {5:.6e}) ".format( \
+#															Mtot, self.mass_want, abs(Mtot - self.mass_want)/self.mass_want, Ltot, 
+#															self.L_want, abs(Ltot - self.L_want)/self.L_want)
 
-		deltavals = np.array([densest, self.omega])		# Note to self - this shallow-copies self.omega, since self.omega is a float (and not some weird class instance thing)
+#		deltavals = np.array([densest, self.omega])		# Note to self - this shallow-copies self.omega, since self.omega is a float (and not some weird class instance thing)
 
-		# Keep past shooting attempts
-		shot_arr = {"M": np.array([Mtot]),
-			"dens": np.array([densest]),
-			"L": np.array([Ltot]),
-			"omega": np.array([self.omega])
-			}
+#		# Keep past shooting attempts
+#		shot_arr = {"M": np.array([Mtot]),
+#			"dens": np.array([densest]),
+#			"L": np.array([Ltot]),
+#			"omega": np.array([self.omega])
+#			}
 
-		while (abs(Mtot - self.mass_want) >= self.mass_tol*self.mass_want or \
-				abs(Ltot - self.L_want) >= self.L_tol*self.L_want) and i < self.nreps and not outerr_code:
+#		while (abs(Mtot - self.mass_want) >= self.mass_tol*self.mass_want or \
+#				abs(Ltot - self.L_want) >= self.L_tol*self.L_want) and i < self.nreps and not outerr_code:
 
-			[J_out, outerr_code] = self.getjacobian_2d(densest, self.temp_c, self.omega, Mtot, Ltot, deltastepcoeff*abs(deltavals), 
-													S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)	# Calculate Jacobian
-			F_neg = np.array([self.mass_want - Mtot, self.L_want - Ltot])
-			deltavals = damp_nrstep*np.linalg.solve(J_out, F_neg)						# http://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linalg.solve.html
-			if not np.allclose(np.dot(J_out, deltavals), F_neg):
-				outerr_code = "Jacobian_err"
-			densest += deltavals[0]
-			self.omega += deltavals[1]
+#			[J_out, outerr_code] = self.getjacobian_2d(densest, self.temp_c, self.omega, Mtot, Ltot, deltastepcoeff*abs(deltavals), 
+#													S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)	# Calculate Jacobian
+#			F_neg = np.array([self.mass_want - Mtot, self.L_want - Ltot])
+#			deltavals = damp_nrstep*np.linalg.solve(J_out, F_neg)						# http://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linalg.solve.html
+#			if not np.allclose(np.dot(J_out, deltavals), F_neg):
+#				outerr_code = "Jacobian_err"
+#			densest += deltavals[0]
+#			self.omega += deltavals[1]
 
-			if densest <= 1e1:		# Central density estimate really shouldn't be lower than about 1e4 g/cc
-				densest = abs(deltavals[0])*0.1
-			if self.omega < 0.:		# In case omega < 0
-				self.omega = abs(deltavals[1])*0.1
-			if self.verbose:
-				print "Jacobian is {0}, deltavals is {1}".format(J_out, deltavals)
-				print "Old rho = {0:.6e}; new rho = {1:.6e}".format(densest - deltavals[0], densest)
-				print "Old omega = {0:.6e}; new omega = {1:.6e}".format(self.omega - deltavals[1], self.omega)
+#			if densest <= 1e1:		# Central density estimate really shouldn't be lower than about 1e4 g/cc
+#				densest = abs(deltavals[0])*0.1
+#			if self.omega < 0.:		# In case omega < 0
+#				self.omega = abs(deltavals[1])*0.1
+#			if self.verbose:
+#				print "Jacobian is {0}, deltavals is {1}".format(J_out, deltavals)
+#				print "Old rho = {0:.6e}; new rho = {1:.6e}".format(densest - deltavals[0], densest)
+#				print "Old omega = {0:.6e}; new omega = {1:.6e}".format(self.omega - deltavals[1], self.omega)
 
-#			if (abs(deltavals[0]/densest) < 2e-6) or (abs(deltavals[1]/self.omega) < 2e-6):
-#				print "deltaval/val = [{0:.3e}, {1:.3e}] is approaching floating point precision - ending integration!".format( \
-#																abs(deltavals[0]/densest), abs(deltavals[1]/self.omega))
-#				outerr_code = "tinystepmod_err"
-#				continue
+##			if (abs(deltavals[0]/densest) < 2e-6) or (abs(deltavals[1]/self.omega) < 2e-6):
+##				print "deltaval/val = [{0:.3e}, {1:.3e}] is approaching floating point precision - ending integration!".format( \
+##																abs(deltavals[0]/densest), abs(deltavals[1]/self.omega))
+##				outerr_code = "tinystepmod_err"
+##				continue
 
-			if S_want:			# IMPORTANT - if S_want is used in getjacobian_rotating, we need to run this anyway to reset self.temp_c!
-				[pressure_dummy, self.temp_c] = self.getpress_rhoS(densest, S_want)
+#			if S_want:			# IMPORTANT - if S_want is used in getjacobian_rotating, we need to run this anyway to reset self.temp_c!
+#				[pressure_dummy, self.temp_c] = self.getpress_rhoS(densest, S_want)
 
-			[Mtot, outerr_code] = self.integrate_star(densest, self.temp_c, self.omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True, recordstar=True)
-			Ltot = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*self.omega
-			if self.verbose:
-				print "Current shot: M = {0:.6e} (vs. M_want = {1:.6e}; relative err. {2:.6e}), L = {3:.6e} (vs. L_want = {4:.6e}; relative err. {5:.6e}) ".format( \
-																Mtot, self.mass_want, abs(Mtot - self.mass_want)/self.mass_want, Ltot, 
-																self.L_want, abs(Ltot - self.L_want)/self.L_want)
+#			[Mtot, outerr_code] = self.integrate_star(densest, self.temp_c, self.omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True, recordstar=True)
+#			Ltot = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*self.omega
+#			if self.verbose:
+#				print "Current shot: M = {0:.6e} (vs. M_want = {1:.6e}; relative err. {2:.6e}), L = {3:.6e} (vs. L_want = {4:.6e}; relative err. {5:.6e}) ".format( \
+#																Mtot, self.mass_want, abs(Mtot - self.mass_want)/self.mass_want, Ltot, 
+#																self.L_want, abs(Ltot - self.L_want)/self.L_want)
 
-			shot_arr["M"] = np.append(shot_arr["M"], Mtot); shot_arr["dens"] = np.append(shot_arr["dens"], densest)
-			shot_arr["L"] = np.append(shot_arr["L"], Ltot); shot_arr["omega"] = np.append(shot_arr["omega"], self.omega)
+#			shot_arr["M"] = np.append(shot_arr["M"], Mtot); shot_arr["dens"] = np.append(shot_arr["dens"], densest)
+#			shot_arr["L"] = np.append(shot_arr["L"], Ltot); shot_arr["omega"] = np.append(shot_arr["omega"], self.omega)
 
-			if self.omega > omega_warn*self.getcritrot(max(self.data["M"]), self.data["R"][-1]):
-				outerr_code = "Omega/Omega_crit > {0:.1e}".format(omega_warn)
+#			if self.omega > omega_warn*self.getcritrot(max(self.data["M"]), self.data["R"][-1]):
+#				outerr_code = "Omega/Omega_crit > {0:.1e}".format(omega_warn)
 
-			i += 1
+#			i += 1
 
-		if i == self.nreps:
-			print "WARNING, maximum number of shooting attempts {0:d} reached!".format(i)
+#		if i == self.nreps:
+#			print "WARNING, maximum number of shooting attempts {0:d} reached!".format(i)
 
-		# If we incur any error
-		if outerr_code:
-			print "OUTERR_CODE {0:s}!  EXITING FUNCTION!".format(outerr_code)
-			return outerr_code
+#		# If we incur any error
+#		if outerr_code:
+#			print "OUTERR_CODE {0:s}!  EXITING FUNCTION!".format(outerr_code)
+#			return outerr_code
 
-		if (abs((Mtot - self.mass_want)/self.mass_want) > self.mass_tol) or (abs(Ltot - self.L_want)/self.L_want > self.L_tol):
-			print "ERROR! (M_tot - mass_want)/mass_want = {0:.6e}; (L_tot - L_want)/L_want = {1:.6e}   THIS IS BIGGER THAN YOUR TOLERANCE!  CHECK YOUR ICS!".format( \
-																(Mtot - self.mass_want)/self.mass_want, (Ltot - self.L_want)/self.L_want)
-		else:
-			print "(L_total - L_want)/L_want = {0:.6e}".format((Ltot - self.L_want)/self.L_want)
+#		if (abs((Mtot - self.mass_want)/self.mass_want) > self.mass_tol) or (abs(Ltot - self.L_want)/self.L_want > self.L_tol):
+#			print "ERROR! (M_tot - mass_want)/mass_want = {0:.6e}; (L_tot - L_want)/L_want = {1:.6e}   THIS IS BIGGER THAN YOUR TOLERANCE!  CHECK YOUR ICS!".format( \
+#																(Mtot - self.mass_want)/self.mass_want, (Ltot - self.L_want)/self.L_want)
+#		else:
+#			print "(L_total - L_want)/L_want = {0:.6e}".format((Ltot - self.L_want)/self.L_want)
 
-		if out_search:
-			return [M_arr, dens_arr]
+#		if out_search:
+#			return [M_arr, dens_arr]
 
 
-	def getjacobian_2d(self, densest, temp_c, omega, Mtot, Ltot, dvals, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8):
-		"""Returns Jacobian matrix J_ij for J*[drho, domega] = [dM, dL]
-		"""
-		# Step density by drho
-		if S_want:
-			[pressure_dummy, temp_c_alt] = self.getpress_rhoS(densest + dvals[0], S_want)
-		else:
-			temp_c_alt = temp_c
-		[Mtot_drho, outerr_code] = self.integrate_star(densest + dvals[0], temp_c_alt, omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True, recordstar=True)
-		Ltot_drho = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*omega
+#	def getjacobian_2d(self, densest, temp_c, omega, Mtot, Ltot, dvals, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8):
+#		"""Returns Jacobian matrix J_ij for J*[drho, domega] = [dM, dL]
+#		"""
+#		# Step density by drho
+#		if S_want:
+#			[pressure_dummy, temp_c_alt] = self.getpress_rhoS(densest + dvals[0], S_want)
+#		else:
+#			temp_c_alt = temp_c
+#		[Mtot_drho, outerr_code] = self.integrate_star(densest + dvals[0], temp_c_alt, omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True, recordstar=True)
+#		Ltot_drho = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*omega
 
-		# Step omega by domega (return density to original densest)
-		omega_alt = omega + dvals[1]		# Step up omega by domega
-		[Mtot_domega, outerr_code] = self.integrate_star(densest, temp_c, omega_alt, P_end_ratio=P_end_ratio, outputerr=True, ps_eostol=ps_eostol, recordstar=True)
-		Ltot_domega = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*omega_alt
+#		# Step omega by domega (return density to original densest)
+#		omega_alt = omega + dvals[1]		# Step up omega by domega
+#		[Mtot_domega, outerr_code] = self.integrate_star(densest, temp_c, omega_alt, P_end_ratio=P_end_ratio, outputerr=True, ps_eostol=ps_eostol, recordstar=True)
+#		Ltot_domega = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*omega_alt
 
-		# Obtain Jacobian
-		J_line1 = [(Mtot_drho - Mtot)/dvals[0], (Mtot_domega - Mtot)/dvals[1]]
-		J_line2 = [(Ltot_drho - Ltot)/dvals[0], (Ltot_domega - Ltot)/dvals[1]]
-		return [np.array([J_line1, J_line2]), outerr_code]
+#		# Obtain Jacobian
+#		J_line1 = [(Mtot_drho - Mtot)/dvals[0], (Mtot_domega - Mtot)/dvals[1]]
+#		J_line2 = [(Ltot_drho - Ltot)/dvals[0], (Ltot_domega - Ltot)/dvals[1]]
+#		return [np.array([J_line1, J_line2]), outerr_code]
 
 ############################# UNCOMMENT IF YOU WANT TO USE 2D JACOBIAN (I HAVEN'T FOUND IT TO BE FASTER #################################
 
@@ -672,14 +662,14 @@ class maghydrostar:
 		else:
 			omegastep = -0.1
 		if self.verbose:
-			print "First Omega estimate = {0:.6e}; dOmega = {1:.6e}; error message is {2:s}".format(self.omega, omegastep, gsm_output)
+			print "First Omega estimate = {0:.3e}; dOmega = {1:.3e}; error message is {2:s}".format(self.omega, omegastep, gsm_output)
 		self.omega += omegastep
 
 		i = 0
 		while abs(omegastep) >= self.omega_crit_tol and i < self.nreps:
 			gsm_output = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
 			if self.verbose:
-				print "Omega estimate = {0:.6e}; dOmega = {1:.6e}; error = {2:s}".format(self.omega, omegastep, gsm_output)
+				print "Omega estimate = {0:.3e}; dOmega = {1:.3e}; error = {2:s}".format(self.omega, omegastep, gsm_output)
 			if gsm_output == "tinystepmod_err":	# HAAAAAAAAAACK!  But it's probably a reasonable one.  Integration should be terminated, but not omega finding.
 				gsm_output = None
 			if (omegastep < 0 and gsm_output == None) or (omegastep > 0 and gsm_output != None):	# If we overstepped the critical rotation point
@@ -689,7 +679,7 @@ class maghydrostar:
 				self.omega += omegastep	# Otherwise keep adding
 
 		if self.verbose:
-			print "Critical Omega {0:.6e} determined to accuracy of {1:.6e}; error {2}".format(self.omega, 10.*omegastep, gsm_output)
+			print "Critical Omega {0:.3e} determined to accuracy of {1:.3e}; error {2}".format(self.omega, 10.*omegastep, gsm_output)
 			
 		if i == self.nreps:
 			print "WARNING, maximum number of shooting attempts {0:d} reached!".format(i)
@@ -782,9 +772,8 @@ class maghydrostar:
 
 ######################################## DERIVATIVES #######################################
 
-	def derivatives_simple(self, y, mass, omega, failtrig=[-100], ps_eostol=1e-8, m_step=1e29, isotherm=False, grad_full=False):
-		"""
-		Derivative that uses the Solberg-Hoiland criterion in addition to the "simple" Gough & Tayler 1966 formulation for magnetic suppression of convection.  Uses user-defined magnetic field.
+	def derivatives_simple(self, y, mass, omega, failtrig=[-100], ps_eostol=1e-8, m_step=1e29, grad_full=False):
+		"""Derivative that uses the Solberg-Hoiland criterion in addition to the "simple" Gough & Tayler 1966 formulation for magnetic suppression of convection.  Uses user-defined magnetic field.
 		"""
 		R = y[0]
 		press = y[1]
@@ -796,63 +785,46 @@ class maghydrostar:
 		Pchi = (1./8./np.pi)*Bfld**2
 		dmdr = 4.*np.pi*R**2.*dens
 
-#		#insurance policy in case -d\rho/dT diverges
-#		mintemp_func_current = self.mintemp_func(temp)
-#		Bfld = mintemp_func_current*Bfld
+		#insurance policy in case -d\rho/dT diverges
+		mintemp_func_current = self.mintemp_func(temp)
+		Bfld = mintemp_func_current*Bfld
 
-		# Take mag pressure Pchi = 0 for calculating hydro coefficients
+		#Take Pchi = 0 for calculating hydro coefficients
 		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro] = self.geteosgradients(dens, temp, 0.0, failtrig=failtrig)
 
 		dydx = np.zeros(3)
 		dydx[0] = 1./dmdr
 		dptotaldm = -self.grav*mass/(4.*np.pi*R**4.) + 1./(6.*np.pi)*omega**2/R
 		dydx[1] = dptotaldm 	#- Pchi_grad*dydx[0]
+		deviation = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press)
 
-		nabla_terms = {}
-
-		if isotherm:
-
-			hydrograd = 0.		# Zero out hydrograd and deviation; totalgrad then will equal 0.
-			deviation = 0.
-
-			if self.simd_usegammavar:	# Populate deviations as zero
-				nabla_terms["dlngamdlnP"] = 0.
-				nabla_terms["nd_gamma"] = 0.
-			if self.simd_usegrav:
-				nabla_terms["dlngdlnP"] = 0.
-				nabla_terms["nd_grav"] = 0.
-			if self.simd_userot:
-				nabla_terms["nd_rot"] = 0.
-
-		else:
-
-			# GT66 magnetic deviation
-			deviation = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press)
-
-			# Magnetic gamma and gravitational terms from GT 66 Eqn. 3.19.
-			if self.simd_usegammavar:
-				press_est = press + dydx[1]*m_step
-				[dens_dummy, temp_dummy, Gamma1_est] = self.getdens_PS_est(press_est, entropy, failtrig=failtrig, dens_est=dens, temp_est=temp, eostol=ps_eostol)	# assumes adiabatic
-				nabla_terms["dlngamdlnP"] = (press/Gamma1)*(Gamma1_est - Gamma1)/(press_est - press)	# dlngamma/dlnP = (P/gamma)*(dgamma/dP)
-				nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press)*nabla_terms["dlngamdlnP"]
-				deviation += nabla_terms["nd_gamma"]
-			if self.simd_usegrav:
-				GH_Poverg = min(press*R**4/(dens*self.grav*mass**2), 1./dens)		# GH_P/g
-				nabla_terms["dlngdlnP"] = -GH_Poverg*(4.*np.pi*dens - 2.*mass/R**3)							# Second term technically becomes NaN, but this function will never see R = 0 or mass = 0
-				nabla_terms["nd_grav"] = 1./delta*Bfld**2/(4.*np.pi*Gamma1*press)*nabla_terms["dlngdlnP"]
-				deviation -= nabla_terms["nd_grav"]
-
-			# rotational term
-			if self.simd_userot:
-				H_Poverg = min(press*R**4/(dens*self.grav**2*mass**2), 1./(self.grav*dens))		# H_P/g
-				nabla_terms["nd_rot"] = 4.*(2./3.)**0.5*H_Poverg*omega**2/delta
-				deviation += nabla_terms["nd_rot"]
+#		deviation = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press) - Bfld**2/Gamma1/dydx[1]*dydx[0]*(4.*np.pi*R**2*dens/mass - 2./R)
 
 		if self.nablarat_crit and (abs(deviation)/hydrograd > self.nablarat_crit):
 			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
 
+		nabla_terms = {}
+		#magnetic gamma and gravitational terms
+		if self.simd_usegammavar:
+			press_est = press + dydx[1]*m_step
+			[dens_dummy, temp_dummy, Gamma1_est] = self.getdens_PS_est(press_est, entropy, failtrig=failtrig, dens_est=dens, temp_est=temp, eostol=ps_eostol)	#assumes adiabatic
+			nabla_terms["dlngamdlnP"] = (press/Gamma1)*(Gamma1_est - Gamma1)/(press_est - press)	#dlngamma/dlnP = (P/gamma)*(dgamma/dP)
+			nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press)*nabla_terms["dlngamdlnP"]
+			deviation += nabla_terms["nd_gamma"]
+		if self.simd_usegrav:
+			GH_Poverg = min(press*R**4/(dens*self.grav*mass**2), 1./dens)		#GH_P/g
+			nabla_terms["dlngdlnP"] = -GH_Poverg*(4.*np.pi*dens - 2.*mass/R**3)							#Second term technically becomes NaN, but this function will never see R = 0 or mass = 0
+			nabla_terms["nd_grav"] = 1./delta*Bfld**2/(4.*np.pi*Gamma1*press)*nabla_terms["dlngdlnP"]
+			deviation -= nabla_terms["nd_grav"]
+
+		#rotational term
+		if self.simd_userot:
+			H_Poverg = min(press*R**4/(dens*self.grav**2*mass**2), 1./(self.grav*dens))		#H_P/g
+			nabla_terms["nd_rot"] = 4.*(2./3.)**0.5*H_Poverg*omega**2/delta
+			deviation += nabla_terms["nd_rot"]
+
 		totalgrad = hydrograd + deviation
-		dydx[2] = temp/press*totalgrad*dydx[1]
+		dydx[2] = mintemp_func_current*temp/press*totalgrad*dydx[1]
 
 		if grad_full:
 			return [dydx, Bfld, Pchi, hydrograd, totalgrad, nabla_terms]
@@ -866,22 +838,25 @@ class maghydrostar:
 
 		R = (3.*M/(4.*np.pi*dens))**(1./3.)
 		moddens = 4./3.*np.pi*dens
-		P = Pc - (3.*self.grav/(8.*np.pi)*moddens**(4./3.) - 0.25/np.pi*omega**2*moddens**(1./3.))*M**(2./3.)	# This is integrated out assuming constant density and magnetic field strength
+		P = Pc - (3.*self.grav/(8.*np.pi)*moddens**(4./3.) - 0.25/np.pi*omega**2*moddens**(1./3.))*M**(2./3.)	#This is integrated out assuming constant density and magnetic field strength
 
 		Bfld = self.magf.fBfld(R, M)
 		Pchi = (1./8./np.pi)*Bfld**2
 
-		[adgradred_dumm, hydrograd, nu_dumm, alpha_dumm, delta, Gamma1, cP_dumm, cPhydro_dumm] = self.geteosgradients(dens, Tc, 0.)	# Central rho, T, and current magnetic pressure since dP/dr = 0 for first step.  Now uses Pchi = 0.
+		[adgradred_dumm, hydrograd, nu_dumm, alpha_dumm, delta, Gamma1, cP_dumm, cPhydro_dumm] = self.geteosgradients(dens, Tc, 0.)	#Central rho, T, and current magnetic pressure since dP/dr = 0 for first step.  Now uses Pchi = 0.
 
-		# GT66 Magnetic deviation
-		deviation = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*P)
+		deviation = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*P)		#Magnetic deviation
+
+		if self.nablarat_crit and (abs(deviation)/hydrograd > self.nablarat_crit):
+			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
 
 		nabla_terms = {}
-		# magnetic field gamma and gravitational terms
+		#magnetic field gamma and gravitational terms
 		if self.simd_usegammavar:
 			if Tc > self.mintemp and not self.simd_suppress:
+#				temp_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,entropy_dummy,failtrig[0] = myhmag.geteosinversionpd(dens,self.abar,self.zbar,P,True)
 				Gamma1_est = self.getgamma_PD(dens, P, failtrig=failtrig, togglecoulomb=True)
-				nabla_terms["dlngamdlnP"] = (Pc/Gamma1)*(Gamma1_est - Gamma1)/(P - Pc)		# dlngamma/dlnP = (P/gamma)*(dgamma/dP)
+				nabla_terms["dlngamdlnP"] = (Pc/Gamma1)*(Gamma1_est - Gamma1)/(P - Pc)		#dlngamma/dlnP = (P/gamma)*(dgamma/dP)
 				nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*Pc)*nabla_terms["dlngamdlnP"]
 				deviation += nabla_terms["nd_gamma"]
 			else:
@@ -889,14 +864,14 @@ class maghydrostar:
 				nabla_terms["nd_gamma"] = 0.
 		if self.simd_usegrav:
 			if Tc > self.mintemp and not self.simd_suppress:
-				nabla_terms["dlngdlnP"] = -4.*np.pi/3.	# Comes from assuming H_P/g = 1/(G*rho)
+				nabla_terms["dlngdlnP"] = -4.*np.pi/3.	#Comes from assuming H_P/g = 1/(G*rho)
 				nabla_terms["nd_grav"] = 1./delta*Bfld**2/(4.*np.pi*Gamma1*Pc)*nabla_terms["dlngdlnP"]
 				deviation -= nabla_terms["nd_grav"]
 			else:
 				nabla_terms["dlngdlnP"] = 0.
 				nabla_terms["nd_grav"] = 0.
 
-		# rotational term
+		#rotational term
 		if self.simd_userot:
 			if Tc > self.mintemp and not self.simd_suppress:
 				nabla_terms["nd_rot"] = 4.*(2./3.)**0.5/(self.grav*dens)*omega**2/delta
@@ -904,27 +879,16 @@ class maghydrostar:
 			else:
 				nabla_terms["nd_rot"] = 0.
 
-		if self.nablarat_crit and (abs(deviation)/hydrograd > self.nablarat_crit):
-			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
+		totalgrad = hydrograd + deviation	#Assume magnetic gradient is the same at R = 0 as is here
 
-		totalgrad = hydrograd + deviation	# Assume magnetic gradient is the same at R = 0 as is here
-		temp = Tc + Tc/Pc*totalgrad*(P - Pc)		
+		temp = max(Tc + Tc/Pc*totalgrad*(P - Pc), self.mintemp)		#If we hit the temperature floor, artificially force temp to remain at it
 
-		# If we hit the temperature floor, artificially force temp to remain at it, and set integration to isothermal
-		if temp <= self.mintemp:
-			temp = self.mintemp
-			isotherm = True
-		else:
-			isotherm = False
-
-		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms, isotherm]
+		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms]
 
 
 	def derivatives_sim_constdelta(self, y, mass, omega, failtrig=[-100], ps_eostol=1e-8, m_step=1e29, grad_full=False):
 		"""Derivative that uses the Solberg-Hoiland criterion in addition to the "simple" Gough & Tayler 1966 formulation for magnetic suppression of convection.  Assumes that B^2/(4\pi\Gamma P_gas + B^2) = \Delta is a constant, back-derives magnetic field.
 		"""
-
-		do_not_use = charles
 
 		R = y[0]
 		press = y[1]
@@ -977,8 +941,6 @@ class maghydrostar:
 	def first_derivatives_sim_constdelta(self, dens, M, Pc, Tc, omega, failtrig=[-100]):
 		"""First step to take for self.derivatives_sim_constdelta()
 		"""
-
-		do_not_use = charles
 
 		R = (3.*M/(4.*np.pi*dens))**(1./3.)
 		moddens = 4./3.*np.pi*dens
@@ -1072,9 +1034,8 @@ class maghydrostar:
 		errtrig = [0]		# Errortrig to stop integrator when Helmholtz NR-method fails to properly invert the EOS (usually due to errors slightly beyond tolerance)
 
 		# Take one step forward (we know the central values, and we assume dP_chi/dr = 0), assuming the central density does not change significantly
-		# first_deriv also returns the starting value of isotherm
 		M = stepsize
-		R, P, temp, Bfld, Pmag, hydrograd, totalgrad, nabla_terms, isotherm = self.first_deriv(dens, M, Pc, temp, omega, failtrig=errtrig)
+		R, P, temp, Bfld, Pmag, hydrograd, totalgrad, nabla_terms = self.first_deriv(dens, M, Pc, temp, omega, failtrig=errtrig)
 		[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
 
 		# If the inversion (will only be used if simd_usegammavar is active) in very first step fails, throw up an error and quit
@@ -1098,13 +1059,15 @@ class maghydrostar:
 			self.data["nabla_mhdr"].append(totalgrad)
 			self.data["nabla_terms"].append(nabla_terms)
 
+		f = open("jesuslives.txt", 'w')
+
 		# Continue stepping using scipy.integrate.odeint
 		while P > Pend:
 
 			# Adaptive stepsize
 			y_in = np.array([R, P, temp])
 			# The only way to "self-consistently" print out B is in the derivative, where it could be modified to force B^2/Pgas to be below some critical value
-			[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
+			[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, grad_full=True)
 			stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-35)))
 
 			if recordstar:
@@ -1115,13 +1078,9 @@ class maghydrostar:
 				self.data["nabla_terms"].append(nabla_terms)
 
 			R, P, temp = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), 
-												args=(omega, errtrig, ps_eostol, stepsize, isotherm), h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
+												args=(omega, errtrig, ps_eostol, stepsize), h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
 
-			if temp <= self.mintemp and not isotherm:
-				R, P, temp, M = self.connect_isotherm(y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, isotherm)
-				isotherm = True
-			else:
-				M += stepsize
+			M += stepsize
 
 			[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
 
@@ -1156,10 +1115,11 @@ class maghydrostar:
 				print "Density is below {0:e}!  Writing last data-point and stopping integration.".format(self.stop_mindenserr)
 				break
 
+		f.close()
 
 		# Step outward one last time
 		y_in = np.array([R, P, temp])
-		[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
+		[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, grad_full=True)
 
 		# Generate a fake data point where M is exactly mass_want.  Useful for setting initial conditions for 3D WD simulations.
 		if recordstar:
@@ -1171,7 +1131,7 @@ class maghydrostar:
 
 			if self.fakeouterpoint:
 				stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-30)))
-				y_out = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), args=(omega, errtrig, ps_eostol, stepsize, isotherm), h0=stepsize*0.01, hmax = stepsize)[1,:]
+				y_out = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), args=(omega, errtrig, ps_eostol, stepsize), h0=stepsize*0.01, hmax = stepsize)[1,:]
 
 				self.data["M"].append(max(self.mass_want, M+stepsize))
 				self.data["R"].append(y_out[0])
@@ -1180,7 +1140,7 @@ class maghydrostar:
 				self.data["T"].append(0.)
 				self.data["Sgas"].append(0.)
 				y_in = y_out	# Gradients one last time
-				[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
+				[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, grad_full=True)
 				self.data["Pmag"].append(Pmag)
 				self.data["B"].append(Bfld)
 				self.data["nabla_hydro"].append(hydrograd)
@@ -1195,39 +1155,6 @@ class maghydrostar:
 			return [M, outerr_code]
 		else:
 			return M
-
-	def connect_isotherm(self, y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, isotherm, iter_max=1000, subtol=1e-8):
-		"""
-		Loop to achieve self.mintemp within tolerance self.mintemp_reltol
-		"""
-		substep = 0.1*stepsize			# we'll use constant stepsizes
-		ys_in = np.array(y_in)			# arrays are passed by reference, not by value!
-		P = ys_in[1]
-		sM = M
-		i = 0
-		while i < iter_max and P > Pend and abs(substep) > subtol*stepsize:			# Integrate forward toward self.mintemp
-			R, P, temp = scipyinteg.odeint(self.derivatives, ys_in, np.array([sM,sM+substep]), 
-												args=(omega, errtrig, ps_eostol, substep, isotherm), h0=substep*0.01, hmax = substep, mxstep=1000)[1,:]
-			sM += substep
-
-			#print R, P, temp, sM, substep/stepsize
-
-			# If we're within the temperature tolerance
-			if abs(temp - self.mintemp)/self.mintemp < self.mintemp_reltol:
-#				if self.verbose:
-#					print ">>>Isotherm: current M = {2:.6e}, temp = {0:.6e}, deviation {1:.6e} from self.mintemp. Switching to isothermal.".format(temp, abs(temp - self.mintemp)/self.mintemp, sM)
-				break
-
-			# If we've overshot
-			if temp < self.mintemp:
-				R, P, temp = np.array(ys_in)	# reset R, P, temp to start of step
-				sM -= substep					# reverse mass step
-				substep = 0.1*substep			# repeat last integration step with greater accuracy
-
-			# If we've done neither, set up next integration
-			ys_in = np.array([R, P, temp])
-				
-		return [R, P, temp, sM]
 
 
 	def unpack_nabla_terms(self):
