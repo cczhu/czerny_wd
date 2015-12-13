@@ -16,7 +16,14 @@ I don't guarantee that the code will work (though it likely will) for Python bui
 
 <h3>Building</h3>
 
-To build, simply type
+To build, first switch line 1324 of myhelm_magstar.f90 from
+
+```fortran
+open(unit=19,file='/home/cczhu/GitHubTemp/czerny_wd/helm_table.dat',status='old')
+```
+to whichever filepath your repo is located at.
+
+Then simply type
 
 ```
 make
