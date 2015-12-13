@@ -33,12 +33,11 @@ class maghydrostar:
 	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
 		rotating).  If < 0, attempts to estimate break-up omega with 
 		self.getomegamax(), if >= 0, uses user defined value.
+	Lwant : wanted angular momentum.
 	S_want : use a user-specified central entropy (erg/K) INSTEAD OF 
 		temperature temp_c.
 	mintemp : temperature floor (K), effectively switches from adiabatic 
 		to isothermal profile if reached.
-	mass_tol : fractional tolerance between mass wanted and mass produced 
-		by self.getstarmodel()
 	composition : "CO", "Mg" or "He" composition.
 	derivtype : derivative function used - either "sim" (default) or "simcd" 
 		(assumes constant magnetic delta = B^2/(B^2 + 4pi*Gamma1*Pgas)).
@@ -69,6 +68,10 @@ class maghydrostar:
 	densest : central density initial estimate for self.getstarmodel().
 	omegaest : estimate of rigid rotating angular speed.  Default is False
 		- code wil then use 0.75*mystar.L_want/I.
+	mass_tol : fractional tolerance between mass wanted and mass produced 
+		by self.getstarmodel()
+	L_tol : fractional tolerance between L wanted and L produced 
+		by self.getrotatingstarmodel()
 	omega_crit_tol : when using the self.getomegamax() iterative finder, 
 		absolute error tolerance for maximum omega.
 	nreps : max number of attempts to find a star in self.getstarmodel().
@@ -248,13 +251,13 @@ class maghydrostar:
 		self.data = {}
 		if dontintegrate:
 			if self.verbose:
-				print "WARNING: integration disabled!"
+				print "WARNING: integration disabled within maghydrostar!"
 		else:
 			if omega < 0.:
 				self.getmaxomega(P_end_ratio=P_end_ratio, densest=densest, S_want=S_want, ps_eostol=ps_eostol)
 			else:
 				if Lwant:
-					self.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, damp_nrstep=0.25)
+					self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, damp_nrstep=0.25)
 				else:
 					self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
 
@@ -644,6 +647,56 @@ class maghydrostar:
 
 ############################# UNCOMMENT IF YOU WANT TO USE 2D JACOBIAN (I HAVEN'T FOUND IT TO BE FASTER #################################
 
+#	def getmaxomega(self, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, out_search=False):
+#		"""
+#		Iterative solver to obtain WD with specified mass and largest possible Omega value that does not feature a density inversion due to too much rotational support.  Arguments have identical meanings as class initialization ones.
+#		"""
+
+#		# This code can't run if these checks aren't in place!
+#		if not self.stop_invertererr:
+#			print "getmaxomega REQUIRES self.stop_invertererr be true!  Setting it so."
+#			self.stop_invertererr = True
+#		if not self.stop_mrat:
+#			print "getmaxomega REQUIRES self.stop_mrat be used!  Setting it to 2."
+#			self.stop_mrat = 2.
+#		if not self.stop_positivepgrad:
+#			print "getmaxomega REQUIRES self.stop_positivepgrad be true!  Setting it so."
+#			self.stop_positivepgrad = True
+
+#		# First, get a stationary model
+#		self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
+#		print "Obtained stationary solution; now let's try a rotating one"
+
+#		self.omega = 0.5*self.getcritrot(self.data["M"][-2], self.data["R"][-2])	#First, get 50% the critical omega estimate (this is an overestimate)
+
+#		gsm_output = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
+#		if gsm_output == None:
+#			omegastep = 0.1
+#		else:
+#			omegastep = -0.1
+#		if self.verbose:
+#			print "First Omega estimate = {0:.6e}; dOmega = {1:.6e}; error message is {2:s}".format(self.omega, omegastep, gsm_output)
+#		self.omega += omegastep
+
+#		i = 0
+#		while abs(omegastep) >= self.omega_crit_tol and i < self.nreps:
+#			gsm_output = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
+#			if self.verbose:
+#				print "Omega estimate = {0:.6e}; dOmega = {1:.6e}; error = {2:s}".format(self.omega, omegastep, gsm_output)
+#			if gsm_output == "tinystepmod_err":	# HAAAAAAAAAACK!  But it's probably a reasonable one.  Integration should be terminated, but not omega finding.
+#				gsm_output = None
+#			if (omegastep < 0 and gsm_output == None) or (omegastep > 0 and gsm_output != None):	# If we overstepped the critical rotation point
+#				self.omega -= 0.9*omegastep
+#				omegastep = omegastep*0.1
+#			else:
+#				self.omega += omegastep	# Otherwise keep adding
+
+#		if self.verbose:
+#			print "Critical Omega {0:.6e} determined to accuracy of {1:.6e}; error {2}".format(self.omega, 10.*omegastep, gsm_output)
+#			
+#		if i == self.nreps:
+#			print "WARNING, maximum number of shooting attempts {0:d} reached!".format(i)
+
 	def getmaxomega(self, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, out_search=False):
 		"""
 		Iterative solver to obtain WD with specified mass and largest possible Omega value that does not feature a density inversion due to too much rotational support.  Arguments have identical meanings as class initialization ones.
@@ -661,30 +714,35 @@ class maghydrostar:
 			self.stop_positivepgrad = True
 
 		# First, get a stationary model
+		if self.verbose:
+			print "Obtaining stationary model."
 		self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
-		print "Obtained stationary solution; now let's try a rotating one"
+		if self.verbose:
+			print "Obtained stationary solution; using radius to estimate critical omega value"
 
-		self.omega = 0.5*self.getcritrot(self.data["M"][-2], self.data["R"][-2])	#First, get 50% the critical omega estimate (this is an overestimate)
+		self.omega = 0.30*self.getcritrot(self.data["M"][-2], self.data["R"][-2])	#First, get 30% the critical omega estimate (this is an overestimate, but we want to keep away from errors for now
+		omegastep = 0.1
 
 		gsm_output = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
-		if gsm_output == None:
-			omegastep = 0.1
-		else:
-			omegastep = -0.1
-		if self.verbose:
-			print "First Omega estimate = {0:.6e}; dOmega = {1:.6e}; error message is {2:s}".format(self.omega, omegastep, gsm_output)
+		if gsm_output:
+			if self.verbose:
+				print "Initial omega estimate too high, leading to error {0}; reducing omega by half!".format(gsm_output)
+			self.omega = 0.5*self.omega
+			gsm_output = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
+			assert gsm_output == None
+		print "First Omega estimate = {0:.6e}; dOmega = {1:.6e}; error message is {2:s}".format(self.omega, omegastep, gsm_output)
 		self.omega += omegastep
 
 		i = 0
-		while abs(omegastep) >= self.omega_crit_tol and i < self.nreps:
+		while abs(omegastep/self.omega) >= self.omega_crit_tol and i < self.nreps:
 			gsm_output = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
 			if self.verbose:
 				print "Omega estimate = {0:.6e}; dOmega = {1:.6e}; error = {2:s}".format(self.omega, omegastep, gsm_output)
-			if gsm_output == "tinystepmod_err":	# HAAAAAAAAAACK!  But it's probably a reasonable one.  Integration should be terminated, but not omega finding.
-				gsm_output = None
-			if (omegastep < 0 and gsm_output == None) or (omegastep > 0 and gsm_output != None):	# If we overstepped the critical rotation point
+			if gsm_output:	# If we overstepped the critical rotation point
 				self.omega -= 0.9*omegastep
 				omegastep = omegastep*0.1
+				if self.verbose:
+					print "Reached integration error {0:s}; stepping back and rerunning with finer stepsize dOmega = {1:.6e}.".format(gsm_output, omegastep)
 			else:
 				self.omega += omegastep	# Otherwise keep adding
 
@@ -740,8 +798,8 @@ class maghydrostar:
 
 
 	def geteosgradients(self, dens, temp, Pchi, failtrig=[-100], togglecoulomb=True):
-		adgradred,hydrograd,nu,alpha,delta,Gamma1,cP,cPhydro,failtrig[0] = myhmag.gethelmgrads(temp,dens,Pchi,self.abar,self.zbar,togglecoulomb)
-		return [adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro]
+		adgradred,hydrograd,nu,alpha,delta,Gamma1,cP,cPhydro,c_s,failtrig[0] = myhmag.gethelmgrads(temp,dens,Pchi,self.abar,self.zbar,togglecoulomb)
+		return [adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s]
 
 
 	def getpress_rhoS(self, dens, entropy, failtrig=[-100], togglecoulomb=True):
@@ -801,7 +859,7 @@ class maghydrostar:
 #		Bfld = mintemp_func_current*Bfld
 
 		# Take mag pressure Pchi = 0 for calculating hydro coefficients
-		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro] = self.geteosgradients(dens, temp, 0.0, failtrig=failtrig)
+		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s] = self.geteosgradients(dens, temp, 0.0, failtrig=failtrig)
 
 		dydx = np.zeros(3)
 		dydx[0] = 1./dmdr
@@ -871,7 +929,7 @@ class maghydrostar:
 		Bfld = self.magf.fBfld(R, M)
 		Pchi = (1./8./np.pi)*Bfld**2
 
-		[adgradred_dumm, hydrograd, nu_dumm, alpha_dumm, delta, Gamma1, cP_dumm, cPhydro_dumm] = self.geteosgradients(dens, Tc, 0.)	# Central rho, T, and current magnetic pressure since dP/dr = 0 for first step.  Now uses Pchi = 0.
+		[adgradred_dumm, hydrograd, nu_dumm, alpha_dumm, delta, Gamma1, cP_dumm, cPhydro_dumm, c_s_dumm] = self.geteosgradients(dens, Tc, 0.)	# Central rho, T, and current magnetic pressure since dP/dr = 0 for first step.  Now uses Pchi = 0.
 
 		# GT66 Magnetic deviation
 		deviation = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*P)
@@ -936,7 +994,7 @@ class maghydrostar:
 		dydx[0] = 1./(4.*np.pi*R**2.*dens)
 		dydx[1] = -self.grav*mass/(4.*np.pi*R**4.) + 1./(6.*np.pi)*omega**2/R		#Ignore magnetic pressure gradient
 
-		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPydro] = self.geteosgradients(dens, temp, 0., failtrig=failtrig)
+		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPydro, c_s] = self.geteosgradients(dens, temp, 0., failtrig=failtrig)
 
 		deviation = self.nabladev
 		Bfld = np.sqrt(4.*np.pi*Gamma1*press*delta*deviation/(1. - delta*deviation))
@@ -984,7 +1042,7 @@ class maghydrostar:
 		moddens = 4./3.*np.pi*dens
 		P = Pc - (3.*self.grav/(8.*np.pi)*moddens**(4./3.) - 0.25/np.pi*omega**2*moddens**(1./3.))*M**(2./3.)	#This is integrated out assuming constant density and magnetic field strength
 
-		[adgradred_dumm, hydrograd, nu_dumm, alpha_dumm, delta, Gamma1, cP_dumm, cPhydro_dumm] = self.geteosgradients(dens, Tc, 0.)
+		[adgradred_dumm, hydrograd, nu_dumm, alpha_dumm, delta, Gamma1, cP_dumm, cPhydro_dumm, c_s_dumm] = self.geteosgradients(dens, Tc, 0.)
 
 		deviation = self.nabladev
 		Bfld = np.sqrt(4.*np.pi*Gamma1*Pc*delta*deviation/(1. - delta*deviation))
@@ -1230,23 +1288,33 @@ class maghydrostar:
 		return [R, P, temp, sM]
 
 
+#	def unpack_nabla_terms(self):
+#		len_nabla = len(self.data["nabla_terms"])
+#		if self.simd_usegammavar:
+#			self.data["dlngamdlnP"] = np.zeros(len_nabla)
+#			self.data["nd_gamma"] = np.zeros(len_nabla)
+#			for i in range(len_nabla):
+#				self.data["dlngamdlnP"][i] = self.data["nabla_terms"][i]["dlngamdlnP"]
+#				self.data["nd_gamma"][i] = self.data["nabla_terms"][i]["nd_gamma"]
+#		if self.simd_usegrav:
+#			self.data["dlngdlnP"] = np.zeros(len_nabla)
+#			self.data["nd_grav"] = np.zeros(len_nabla)
+#			for i in range(len_nabla):
+#				self.data["dlngdlnP"][i] = self.data["nabla_terms"][i]["dlngdlnP"]
+#				self.data["nd_grav"][i] = self.data["nabla_terms"][i]["nd_grav"]
+#		if self.simd_userot:
+#			self.data["nd_rot"] = np.zeros(len_nabla)
+#			for i in range(len_nabla):
+#				self.data["nd_rot"][i] = self.data["nabla_terms"][i]["nd_rot"]
+#		del self.data["nabla_terms"]	#delete nabla_terms to remove duplicate copies
+
 	def unpack_nabla_terms(self):
-		if self.simd_usegammavar:
-			self.data["dlngamdlnP"] = []
-			self.data["nd_gamma"] = []
-			for i in range(len(self.data["nabla_terms"])):
-				self.data["dlngamdlnP"].append(self.data["nabla_terms"][i]["dlngamdlnP"])
-				self.data["nd_gamma"].append(self.data["nabla_terms"][i]["nd_gamma"])
-		if self.simd_usegrav:
-			self.data["dlngdlnP"] = []
-			self.data["nd_grav"] = []
-			for i in range(len(self.data["nabla_terms"])):
-				self.data["dlngdlnP"].append(self.data["nabla_terms"][i]["dlngdlnP"])
-				self.data["nd_grav"].append(self.data["nabla_terms"][i]["nd_grav"])
-		if self.simd_userot:
-			self.data["nd_rot"] = []
-			for i in range(len(self.data["nabla_terms"])):
-				self.data["nd_rot"].append(self.data["nabla_terms"][i]["nd_rot"])
+		len_nabla = len(self.data["nabla_terms"])
+		for item in self.data["nabla_terms"][0].keys():
+			self.data[item] = np.zeros(len_nabla)
+		for i in range(len_nabla):
+			for item in self.data["nabla_terms"][0].keys():
+				self.data[item][i] = self.data["nabla_terms"][i][item]
 		del self.data["nabla_terms"]	#delete nabla_terms to remove duplicate copies
 
 
@@ -1336,8 +1404,11 @@ class maghydrostar:
 			self.data["B_natural"][i] = self.magf.fBfld(self.data["R"][i], self.data["M"][i])
 			self.data["Pmag_natural"][i] = (1./8./np.pi)*self.magf.fBfld(self.data["R"][i], self.data["M"][i])**2	#Get what user wants B(r) to be
 			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
-			[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
-			[adgradred, hydrograd, self.data["nu"][i], self.data["alpha"][i], self.data["delta"][i], self.data["gamma_ad"][i], self.data["cP"][i], cPydro_dumm] = self.geteosgradients(self.data["rho"][i], self.data["T"][i], Pmag)
+			try:
+				[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
+			except:
+				[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, self.fconv_data["Fconv"][i], m_step=m_step[i], grad_full=True)
+			[adgradred, hydrograd, self.data["nu"][i], self.data["alpha"][i], self.data["delta"][i], self.data["gamma_ad"][i], self.data["cP"][i], cPydro_dumm, c_s_dumm] = self.geteosgradients(self.data["rho"][i], self.data["T"][i], Pmag)
 			self.data["nabla_ad"][i] = (self.data["Pgas"][i] + Pmag)/self.data["T"][i]*adgradred
 		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
 
@@ -1347,7 +1418,7 @@ class maghydrostar:
 		"""
 
 		#Obtain energies and additional stuff
-		if fresh_calc or not self.data.has_key("c_s"):
+		if fresh_calc or not self.data.has_key("Epot"):
 			self.getenergies()
 
 		if fresh_calc or not self.data.has_key("dy"):
@@ -1390,10 +1461,10 @@ class maghydrostar:
 
 		self.data["tau_cc"] = self.data["cP"]*self.data["T"]/self.data["eps_nuc"]								# Nuclear burning timescale
 		self.data["t_blob"] = scipyinteg.cumtrapz(1./self.data["vconv"], x=self.data["R"], initial=0.)			# Blob travel time from r = 0 to r = R_WD
-		self.data["t_heat_cum"] = scipyinteg.cumtrapz(4.*np.pi*self.data["R"]**2*self.data["rho"]*self.data["cP"]*self.data["T"], x=self.data["R"], initial=0.)/self.data["Lnuc"]		# Cumulative convective heating time (from CWvK unpublished Eqn. 8)
-		self.data["t_heat_cum"][0] = 0.		# remove the NaN
+		self.data["t_heat_cum"] = scipyinteg.cumtrapz(4.*np.pi*self.data["R"]**2*self.data["rho"]*self.data["cP"]*self.data["T"], x=self.data["R"], initial=0.)/self.data["Lnuc"]											# Cumulative convective heating time (from CWvK unpublished Eqn. 8)
+		self.data["t_heat_cum"][0] = 0.									# remove the NaN
 		self.data["t_dyn"] = scipyinteg.cumtrapz(1./self.data["c_s"], x=self.data["R"], initial=0.)	# Sound crossing (dynamical) time
-		self.data["t_heat"] = max(self.data["t_heat_cum"])					# Convective heating time for entire star
+		self.data["t_heat"] = max(self.data["t_heat_cum"])				# Convective heating time for entire star
 		i = min((self.data["Lnuc"]/max(self.data["Lnuc"]) > 0.95).nonzero()[0])
 		self.data["R_nuc"] = self.data["R"][i]							# Outer boundary of nuclear burning region
 		self.data["t_conv"] = self.data["t_blob"][i]					# Blob travel time across nuclear burning region (CWvK unpublished Eqn. 25)

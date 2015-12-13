@@ -54,17 +54,17 @@
 
       subroutine gethelmgrads( temp, dens, magPchi, abar, zbar, adgradred, &
 					hydrograd, my_nu, my_alpha, my_delta, my_gamma1, &
-					my_cp, my_cph, failtrig, togglecoulomb )
+					my_cp, my_cph, my_c_s, failtrig, togglecoulomb )
 
       include 'implno.dek'
       include 'starmod_vector_eos.dek'
 
       double precision temp, dens, magPchi, abar, zbar, adgradred
       double precision my_alpha, my_cp, my_drhodt, Pchi_over_dens, my_delta, my_nu, hydrograd
-      double precision my_gamma1, my_cph
+      double precision my_gamma1, my_cph, my_c_s
       logical failtrig, togglecoulomb, togglecoulomb_two
       common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) adgradred, my_nu, my_alpha, my_delta, hydrograd, my_gamma1, my_cp, my_cph, failtrig
+!f2py intent(out) adgradred, my_nu, my_alpha, my_delta, hydrograd, my_gamma1, my_cp, my_cph, my_c_s, failtrig
  
       temp_row(1) = temp ; den_row(1)  = dens ; abar_row(1) = abar ; zbar_row(1) = zbar
       jlo_eos = 1 ; jhi_eos = 1
@@ -80,6 +80,7 @@
       my_delta = -temp/dens*my_drhodt
       my_alpha = (ptot_row(1) + magPchi)/dens*(dpd_row(1) + Pchi_over_dens)**(-1)
       my_nu = magPchi/(dens*dpd_row(1) + magPchi)
+      my_c_s = cs_row(1)
 
 	  adgradred = my_delta/dens/my_cp		!T/P_T*nabla_ad
 
@@ -1320,7 +1321,7 @@
 
 ! open the file (use softlinks to input the desired table)
 
-       open(unit=19,file='/home/cczhu/Dropbox/MyPrograms/AnalysisMod/helm_table.dat',status='old')
+       open(unit=19,file='/home/cczhu/GitHubTemp/czerny_wd/helm_table.dat',status='old')
 
 
 ! for standard table limits

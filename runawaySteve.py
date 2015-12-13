@@ -1,4 +1,4 @@
-import StarMod as Star
+import StarModSteve as Star
 import magprofile_mass as magprof
 import numpy as np
 import copy
@@ -33,22 +33,22 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	deltastepcoeff_omega = 0.1
 	damp_nrstep = 0.25
 	
-	if r_in.has_key("L_original"):
-		outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
-													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
-													omega_warn=1.)
-		if outerr_code:
-			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH 0.5*OMEGA ---------------"
-			outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=0.5*omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
-													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
-													omega_warn=1.)
 #	if r_in.has_key("L_original"):
-#		outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
-#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+#		outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
+#													omega_warn=1.)
 #		if outerr_code:
-#			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH A LOWER OMEGA AND TIGHTER STEPPING---------------"
-#			outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
-#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+#			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH 0.5*OMEGA ---------------"
+#			outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=0.5*omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+#													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
+#													omega_warn=1.)
+	if r_in.has_key("L_original"):
+		outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+		if outerr_code:
+			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH A LOWER OMEGA AND TIGHTER STEPPING---------------"
+			outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
 	else:
 		outerr_code = mystar.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
 										deltastepcoeff=deltastepcoeff_rho)
@@ -106,12 +106,13 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 	if (omega != 0) or r_in["magprofile"]:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
 		mymagzero = magprof.magprofile(None, None, None, blankfunc=True)
-		hstar = Star.maghydrostar(r_in["mass"], 5e6, magprofile=mymagzero, omega=0., S_want=False, mintemp=r_in["mintemp"], derivtype=r_in["derivtype"], composition=r_in["composition"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+		hstar = Star.mhs_steve(r_in["mass"], False, magprofile=mymagzero, omega=0., temp_c=5e6, mintemp=r_in["mintemp"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 		densest=0.9*hstar.data["rho"][0]
 
 	print "*************Okay, let's make a low-temperature (MHD/rotating) star************"
-	mystar = Star.maghydrostar(r_in["mass"], 5e6, magprofile=r_in["magprofile"], omega=r_in["omega"], S_want=False, 	#Rest after this is identical to function call above
-				mintemp=r_in["mintemp"], derivtype=r_in["derivtype"], composition=r_in["composition"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+	#Rest after this is identical to function call above
+	mystar = Star.mhs_steve(r_in["mass"], False, magprofile=r_in["magprofile"], omega=r_in["omega"], temp_c=5e6,
+				mintemp=r_in["mintemp"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 
 	if r_in["omega"] < 0:
 		print "FOUND critical Omega = {0:.3e}!  We'll use {1:.3e} of this value for the runaway.".format(mystar.omega, r_in["omega_run_rat"])

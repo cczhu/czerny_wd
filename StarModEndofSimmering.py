@@ -287,7 +287,7 @@ class endofsimmer(maghydrostar):
 			M += stepsize
 
 			if temp < 1.5e3:
-				lordjesu = theword
+				breaking = bad
 
 			if recordstar:
 				self.data["M"].append(M)
