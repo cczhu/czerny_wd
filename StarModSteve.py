@@ -56,12 +56,25 @@ class mhs_steve(maghydrostar):
 	verbose : report happenings within code.
 	dontintegrate: don't perform any integration
 
+
 	Returns
 	-------
 	mystar : mhs_steve class instance
 		If star was integrated and data written, results can be found in
 		mystar.data.  Further analysis can be performed with 
 		mystar.getenergies,	mystar.getgradients and mystar.getconvection.
+
+
+	Notes
+	-----
+	Child class of maghydrostar, since most of the machinery used to run these
+	models is identical to those in maghydrostar.  getstarmodel, 
+	getrotatingstarmodel and getmaxomega all work with this class.  
+	See StarMod.py for further documentation.
+
+	Examples
+	--------
+	See examples in StarMod.py - command syntax is identica.
 	"""
 
 	def __init__(self, mass, S_want, magprofile=False, omega=0., Lwant=0., 
@@ -86,16 +99,19 @@ class mhs_steve(maghydrostar):
 
 		self.derivatives = self.derivatives_steve
 		self.first_deriv = self.first_derivatives_steve
+		if self.verbose:
+			print "Replacing derivatives_gtsh with derivatives_steve!"
 
 		if dontintegrate:
 			if self.verbose:
-				print "WARNING: integration disabled within maghydrostar!"
+				print "WARNING: integration disabled within mhs_steve!"
 		else:
 			if omega < 0.:
 				self.getmaxomega(densest=densest, S_want=S_want)
 			else:
 				if Lwant:
-					self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, damp_nrstep=0.25)
+					self.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, damp_nrstep=0.25)
+					#self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, damp_nrstep=0.25)
 				else:
 					self.getstarmodel(densest=densest, S_want=S_want)
 
@@ -112,14 +128,6 @@ class mhs_steve(maghydrostar):
 		temp_c : central temperature (K)
 		omega : solid-body angular speed (rad/s)
 		outputerr : output any error codes received from integrator
-
-		Notes
-		----------
-		In Python, operator overloading is done using "__" before the method name.
-		We actually want the maghydrostar functions to be overridden, so we don't
-		do this.  See:
-		http://stackoverflow.com/questions/12764995/python-overriding-an-inherited-class-method
-		https://docs.python.org/2/reference/expressions.html#atom-identifiers
 		"""
 
 		stepsize = max(self.mass_want,0.4*self.Msun)*0.01*min(self.mass_tol, 1e-6)	# Found out the hard way that if you use simd_usegammavar, having a large mass_tol can cause errors
@@ -388,14 +396,14 @@ class mhs_steve(maghydrostar):
 
 			agrav_eff = -dptotaldm/dydx[0]/dens		# g_eff = -dP/dr/rho
 			H_P = min(-press*dydx[0]/dptotaldm, (press/self.grav/dens**2)**0.5)	# H_P = min(-P/(dP/dR), sqrt(P/G\rho^2)) (Eggleton 71 approx.)
-			nabla_terms["c_s"] = (agrav_eff*delta*H_P/8.)**0.5					# c_s = sqrt(g*delta*H_P/8) (Comparing Stevenson 79 to K&W MLT)
+			#nabla_terms["c_s"] = (agrav_eff*delta*H_P/8.)**0.5					# c_s = sqrt(g*delta*H_P/8) (Comparing Stevenson 79 to K&W MLT)
 
 			nabla_terms["v_conv"] = (0.25*delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
 
 			if omega == 0.:
-				nabla_terms["nd"] = (nabla_terms["v_conv"]/nabla_terms["c_s"])**2
+				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv"]/nabla_terms["c_s"])**2
 			else:
-				nabla_terms["nd"] = (nabla_terms["v_conv"]/nabla_terms["c_s"])*(2*H_P*omega/nabla_terms["c_s"])
+				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv"]/nabla_terms["c_s"])*(2*H_P*omega/nabla_terms["c_s"])
 
 		if self.nablarat_crit and (abs(nabla_terms["nd"])/hydrograd > self.nablarat_crit):
 			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")

@@ -7,25 +7,32 @@ import copy
 ################## MAGPROFILE CLASS ###############################
 
 class magprofile:
-	"""Magnetic field profiler.  Returns functions fBfld and fBderiv, used in StarMod.maghydrostar to determine and propagate magnetic field.
+	"""
+	Magnetic field profiler.  Returns functions fBfld and fBderiv, used in
+	StarMod.maghydrostar to determine and propagate magnetic field.
 
-		Arguments:
-		radius - radius
-		mass - mass
-		Bfld - B(r) profile
-		gamma - defined in Feiden & Chaboyer 12 as a geometric correction to the magnetic pressure, i.e. Pchi = (gamma - 1)B^2/8/pi.  Defaults to 4./3. (maximum magnetic tension), can go up to 2 (no tension)
-		filename - read profile from file (class constructor will not read radius or Bfld in that case)
-		getpres - if non-zero, the gamma value of (gamma - 1)chi*rho = (gamma - 1)B^2/8/pi.  THIS CURRENTLY DOES NOT WORK PROPERLY (probably too steep for splines)
-		smooth - smooth profile before using it for interpolation
-		method - either "spline", "pwr" or "brokenpwr"
-		bpargs - list of two arrays, each denoting the radius range for fitting each segment of the broken power law; by default, [np.array([1e6,2e8]), np.array([8e8, 1e10])]
-		renorm - renormalize fit to central magnetic strength
-		checkposderiv - check Bfld derivative to always be positive
-		blankfunc - if true, returns a function with Bfld = 0, Bderiv = 0
+	Parameters
+	----------
+	radius - radius
+	mass - mass
+	Bfld - B(r) profile
+	gamma - defined in Feiden & Chaboyer 12 as a geometric correction to the 
+		magnetic pressure, i.e. Pchi = (gamma - 1)B^2/8/pi.  Defaults to 4./3. 
+		(maximum magnetic tension), can go up to 2 (no tension)
+	filename - read profile from file (class constructor will not read radius 
+		or Bfld in that case)
+	smooth - smooth profile before using it for interpolation
+	method - either "spline", "pwr" or "brokenpwr"
+	bpargs - list of two arrays, each denoting the radius range for fitting each segment of the broken power law; by default, [np.array([1e6,2e8]), np.array([8e8, 1e10])]
+	renorm - renormalize fit to central magnetic strength
+	checkposderiv - check Bfld derivative to always be positive
+	blankfunc - if true, returns a function with Bfld = 0, Bderiv = 0
 	"""
 
-	def __init__(self, radius, mass, Bfld, gamma=4./3., filename=False, smooth=False, method="brokenpwr", bpargs=[np.array([1e6,2e8]), np.array([8e8, 1e10])], 
-					min_r=1e3, spline_k=3, spline_s=1., renorm=False, checkposderiv=True, blankfunc=False):
+	def __init__(self, radius, mass, Bfld, gamma=4./3., filename=False, 
+					smooth=False, method="brokenpwr", bpargs=[np.array([1e6,2e8]), 
+					np.array([8e8, 1e10])], min_r=1e3, spline_k=3, spline_s=1., 
+					renorm=False, checkposderiv=True, blankfunc=False):
 
 		self.gamma = gamma
 		self.nabladev = False
@@ -141,7 +148,7 @@ class magprofile:
 		frad = UnivariateSpline(mass_ext, radius_ext, k=self.spline_k, s=self.spline_s*len(radius_ext))
 		frderiv = frad.derivative()
 		if np.isnan(frad(1e33)):
-			jesus = lord
+			raise AssertionError("Univariate spline instance unable to take on a massive radius!")
 		return [frad, frderiv]
 
 

@@ -12,13 +12,8 @@ import copy
 
 class maghydrostar:
 	"""
-	Magnetohydrostatic star generator.  Generates spherical WDs with 
-	adiabatic temperature profiles using the Helmholtz 
-	(http://cococubed.asu.edu/code_pages/eos.shtml) EOS, rigid rotation 
-	spherical approximation and Gough & Tayler 66 magnetic convective 
-	suppression criterion (but no pressure term).  Includes gravitational 
-	and varying specific heat ratio terms of GT66 criterion.  All values 
-	in CGS.
+	OLD STAR MAKER MODIFIED FOR MODERN MYHELM_MAGSTAR TO RUN
+	COMPARISONS WITH!
 
 	Parameters
 	----------
@@ -730,7 +725,7 @@ blabhlabh
 
 
 	def geteosgradients(self, dens, temp, Pchi, failtrig=[-100], togglecoulomb=True):
-		adgradred,hydrograd,nu,alpha,delta,Gamma1,cP,cPhydro,failtrig[0] = myhmag.gethelmgrads(temp,dens,Pchi,self.abar,self.zbar,togglecoulomb)
+		adgradred,hydrograd,nu,alpha,delta,Gamma1,cP,cPhydro,c_s,failtrig[0] = myhmag.gethelmgrads(temp,dens,Pchi,self.abar,self.zbar,togglecoulomb)
 		return [adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro]
 
 
@@ -1059,8 +1054,6 @@ blabhlabh
 			self.data["nabla_mhdr"].append(totalgrad)
 			self.data["nabla_terms"].append(nabla_terms)
 
-		f = open("jesuslives.txt", 'w')
-
 		# Continue stepping using scipy.integrate.odeint
 		while P > Pend:
 
@@ -1114,8 +1107,6 @@ blabhlabh
 					outerr_code = "mindens_err"
 				print "Density is below {0:e}!  Writing last data-point and stopping integration.".format(self.stop_mindenserr)
 				break
-
-		f.close()
 
 		# Step outward one last time
 		y_in = np.array([R, P, temp])
