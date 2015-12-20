@@ -35,7 +35,6 @@ class magprofile:
 					renorm=False, checkposderiv=True, blankfunc=False):
 
 		self.gamma = gamma
-		self.nabladev = False
 		self.spline_k = spline_k
 		self.spline_s = spline_s
 		self.min_r = min_r

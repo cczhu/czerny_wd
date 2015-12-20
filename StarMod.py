@@ -1280,6 +1280,10 @@ class maghydrostar:
 		self.data["vnuc"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_P"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
 
+		# Obtain Woosley, Wunch & Kuhlen 2004 Eqn. 36. integral
+		dTdr = self.data["T"]/self.data["Pgas"]*self.data["nabla_mhdr"]*self.data["dy"][:,1]/self.data["dy"][:,0]
+		self.data["WWK04_integral"] = scipyinteg.cumtrapz(dTdr + self.data["eps_nuc"]/self.data["cP"]/self.data["vconv"], x=self.data["R"], initial=0.)
+
 
 	def gettimescales(self, fresh_calc=False):
 		"""Obtains timescales for convective transport, central nuclear burning, etc.
