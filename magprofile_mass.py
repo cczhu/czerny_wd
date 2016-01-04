@@ -16,9 +16,6 @@ class magprofile:
 	radius - radius
 	mass - mass
 	Bfld - B(r) profile
-	gamma - defined in Feiden & Chaboyer 12 as a geometric correction to the 
-		magnetic pressure, i.e. Pchi = (gamma - 1)B^2/8/pi.  Defaults to 4./3. 
-		(maximum magnetic tension), can go up to 2 (no tension)
 	filename - read profile from file (class constructor will not read radius 
 		or Bfld in that case)
 	smooth - smooth profile before using it for interpolation
@@ -28,13 +25,16 @@ class magprofile:
 	checkposderiv - check Bfld derivative to always be positive
 	blankfunc - if true, returns a function with Bfld = 0, Bderiv = 0
 	"""
+#	gamma - defined in Feiden & Chaboyer 12 as a geometric correction to the 
+#		magnetic pressure, i.e. Pchi = (gamma - 1)B^2/8/pi.  Defaults to 4./3. 
+#		(maximum magnetic tension), can go up to 2 (no tension)
 
-	def __init__(self, radius, mass, Bfld, gamma=4./3., filename=False, 
+	def __init__(self, radius, mass, Bfld, filename=False, 
 					smooth=False, method="brokenpwr", bpargs=[np.array([1e6,2e8]), 
 					np.array([8e8, 1e10])], min_r=1e3, spline_k=3, spline_s=1., 
 					renorm=False, checkposderiv=True, blankfunc=False):
 
-		self.gamma = gamma
+		# self.gamma = gamma
 		self.spline_k = spline_k
 		self.spline_s = spline_s
 		self.min_r = min_r

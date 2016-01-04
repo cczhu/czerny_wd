@@ -1134,12 +1134,18 @@
 !		 write(*,*) numTries
       end do
 
-	  if (eosinvertfail .eqv. .true.) then
-		 write(*,*) "EOSInversionSP ERROR within invert_helm_pt_quiet! "
-	  end if
-      
-      if((numTries .eq. MAXTRIES .or. (eosinvertfail .eqv. .true.)) .and. warninglabel .eq. 1) then
-		 write(*,*) "EOSInversionSP ERROR! "
+	  if((eosinvertfail .eqv. .true.) .and. warninglabel .eq. 1) then
+		 write(*,*) "EOSInversionSP_withest ERROR within invert_helm_pt_quiet! "
+		 write(*,*) "numTries: ", numTries
+         write(*,*) "entropy: ", entropy, "press: ", pressure
+		 write(*,*) "T_current: ", newTemp, "T_prev: ", oldTemp
+		 write(*,*) "dens_current: ", den_row(1), "dens_prev: ", den_row(1) - newdeltadens
+		 write(*,*) "error = ", abs((newTemp - oldTemp)/newTemp)
+		 write(*,*) "eostol = ", eostol, '  fpmin =',fpmin
+		 write(*,*) "f/df  =", deltaTemp,' f   =',f,    ' df    =',df
+		 eosinvertfail = .true.
+	  else if((numTries .eq. MAXTRIES) .and. warninglabel .eq. 1) then
+		 write(*,*) "EOSInversionSP_withest ERROR! "
 		 write(*,*) "numTries: ", numTries
          write(*,*) "entropy: ", entropy, "press: ", pressure
 		 write(*,*) "T_current: ", newTemp, "T_prev: ", oldTemp

@@ -79,8 +79,14 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 	verbose: report happenings within code
 	"""
 
+	# Save a few details about the magnetic field (though we'll need better records for the actual paper)
+	try:
+		mymagsave = np.array([mymag.fBfld_r(0)[0], mymag.fBfld_r(5e8)[0]])
+	except:
+		mymagsave = False
+
 	r_in = {"mass": starmass, 
-			"magprofile": mymag, 
+			"magprofile": mymagsave, 
 			"omega": omega, 
 			"omega_run_rat": omega_run_rat, 
 			"S_arr": S_arr, 
@@ -103,14 +109,14 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 			"omega_crit_tol": omega_crit_tol, 
 			"omega_warn": omega_warn}
 
-	if (omega != 0) or r_in["magprofile"]:
+	if (omega != 0) or mymag:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
 		mymagzero = magprof.magprofile(None, None, None, blankfunc=True)
 		hstar = Star.maghydrostar(r_in["mass"], 5e6, magprofile=mymagzero, omega=0., S_want=False, mintemp=r_in["mintemp"], derivtype=r_in["derivtype"], composition=r_in["composition"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 		densest=0.9*hstar.data["rho"][0]
 
 	print "*************Okay, let's make a low-temperature (MHD/rotating) star************"
-	mystar = Star.maghydrostar(r_in["mass"], 5e6, magprofile=r_in["magprofile"], omega=r_in["omega"], S_want=False, 	#Rest after this is identical to function call above
+	mystar = Star.maghydrostar(r_in["mass"], 5e6, magprofile=mymag, omega=r_in["omega"], S_want=False, 	#Rest after this is identical to function call above
 				mintemp=r_in["mintemp"], derivtype=r_in["derivtype"], composition=r_in["composition"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 
 	if r_in["omega"] < 0:
