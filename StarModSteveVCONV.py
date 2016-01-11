@@ -390,7 +390,7 @@ class mhs_steve(maghydrostar):
 		if isotherm:
 
 			hydrograd = 0.		# Zero out hydrograd and deviation; totalgrad then will equal 0.
-			nabla_terms = {"v_conv_st": 0., "c_s_st": c_s, "nd": 0.}	# Populate deviations as zero
+			nabla_terms = {"vc_coeff_st": 0., "v_conv_st": 0., "c_s_st": c_s, "nd": 0.}	# Populate deviations as zero
 
 		else:
 
@@ -398,9 +398,12 @@ class mhs_steve(maghydrostar):
 
 			agrav_eff = -dptotaldm/dydx[0]/dens		# g_eff = -dP/dr/rho
 			H_P = min(-press*dydx[0]/dptotaldm, (press/self.grav/dens**2)**0.5)	# H_P = min(-P/(dP/dR), sqrt(P/G\rho^2)) (Eggleton 71 approx.)
-			#nabla_terms["c_s_st"] = (agrav_eff*delta*H_P/8.)**0.5					# c_s = sqrt(g*delta*H_P/8) (Comparing Stevenson 79 to K&W MLT)
+			nabla_terms["c_s_st"] = (agrav_eff*H_P/8.)**0.5					# c_s = sqrt(g*delta*H_P/8) (Comparing Stevenson 79 to K&W MLT)
 
 			nabla_terms["v_conv_st"] = (0.25*delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
+			nabla_terms["vc_coeff_st"] = (0.25*delta*agrav_eff*H_P/cP/temp)**(1./3.)
+#			nabla_terms["v_conv_st"] = (Fconv/dens)**(1./3.) #(0.25*delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
+#			nabla_terms["vc_coeff_st"] = 1. #(0.25*delta*agrav_eff*H_P/cP/temp)**(1./3.)
 
 			if omega == 0.:
 				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2
@@ -435,7 +438,7 @@ class mhs_steve(maghydrostar):
 		#agrav_eff = -self.grav*M/R**2 + 2./3.*omega**2*R		# -Gm/r^2 + 2\Omega^2 r/3
 		#H_P = min(Pc*R/(Pc - P), (Pc/self.grav/dens**2)**0.5)	# H_P = -P/(dP/dR) = -Pc*(R - 0)/(P - Pc) = Pc*R/(Pc - P), or sqrt(P/G\rho^2) (Eggleton 71 approx.)
 
-		nabla_terms = {"v_conv_st": 0., "c_s_st": c_s, "nd": 0.}
+		nabla_terms = {"vc_coeff_st": 0., "v_conv_st": 0., "c_s_st": c_s, "nd": 0.}
 
 		totalgrad = hydrograd + nabla_terms["nd"]	# Curently nabla_terms["nd"] = 0
 

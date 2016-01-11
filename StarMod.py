@@ -1236,7 +1236,7 @@ class maghydrostar:
 			try:
 				[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
 			except:
-				[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, self.fconv_data["Fconv"][i], m_step=m_step[i], grad_full=True)
+				[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, self.fconv_data["Fconv_st"][i], m_step=m_step[i], grad_full=True)
 			[adgradred, hydrograd, self.data["nu"][i], self.data["alpha"][i], self.data["delta"][i], self.data["gamma_ad"][i], self.data["cP"][i], cPydro_dumm, c_s_dumm] = self.geteosgradients(self.data["rho"][i], self.data["T"][i], Pmag)
 			self.data["nabla_ad"][i] = (self.data["Pgas"][i] + Pmag)/self.data["T"][i]*adgradred
 		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
@@ -1275,9 +1275,9 @@ class maghydrostar:
 		self.data["Lconv"][0] = 0.
 		self.data["Fnuc"] = self.data["Lnuc"]/4./np.pi/R**2
 		self.data["Fconv"] = self.data["Lconv"]/4./np.pi/R**2
-		self.data["vconv"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_P"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
+		self.data["vconv"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
 		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
-		self.data["vnuc"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_P"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
+		self.data["vnuc"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
 
 		# Obtain Woosley, Wunch & Kuhlen 2004 Eqn. 36. integral
@@ -1349,7 +1349,7 @@ class maghydrostar:
 
 		datalength = len(self.data["M"])
 
-		# But if we don't seem to have the standard faire values always printed out, just re-calculate them (yes, that means we do overwrite the ones we do have, so 
+		# But if we don't seem to have the standard faire values always printed out, just re-calculate them (yes, that means we do overwrite the ones we do have)
 		if not np.prod(np.array([self.data.has_key(x) for x in ["Pgas", "Sgas", "Pmag", "nabla_hydro", "nabla_mhdr"]])):
 			print "WARNING - I didn't find Pgas, Sgas, Pmag, nabla_hydro, or nabla_mhdr in your input - recalculating (including deviations)!"
 			
@@ -1373,7 +1373,7 @@ class maghydrostar:
 				self.data["nd_rot"] = np.zeros(datalength)
 
 			for i in range(datalength):
-				[temp_data["Pgas"][i], temp_data["Sgas"][i]] = self.getpress_rhoT(self, self.data["rho"][i], self.data["T"][i])
+				[temp_data["Pgas"][i], temp_data["Sgas"][i]] = self.getpress_rhoT(self.data["rho"][i], self.data["T"][i])
 				[dydx, Bfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms]
 				y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
 				[dummydy, dummyBfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
