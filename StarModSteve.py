@@ -353,15 +353,10 @@ class mhs_steve(maghydrostar):
 		for i in range(len_nabla):
 			for item in self.data["nabla_terms"][0].keys():
 				self.data[item][i] = self.data["nabla_terms"][i][item]
-		del self.data["nabla_terms"]	#delete nabla_terms to remove duplicate copies
+		del self.data["nabla_terms"]	# delete nabla_terms to remove duplicate copies
 
 
 	def unpack_Fconv(self):
-#		len_fconv = len(self.fconv_data["Lnuc_st"])
-#		for item in self.fconv_data.keys():
-#			self.data[item] = np.array(self.fconv_data[item])
-#		for item in self.fconv_data.keys():
-#			self.fconv_data[item] = np.array(self.fconv_data[item])
 		for item in self.fconv_data.keys():
 			self.data[item] = np.array(self.fconv_data[item])
 
@@ -398,9 +393,9 @@ class mhs_steve(maghydrostar):
 
 			agrav_eff = -dptotaldm/dydx[0]/dens		# g_eff = -dP/dr/rho
 			H_P = min(-press*dydx[0]/dptotaldm, (press/self.grav/dens**2)**0.5)	# H_P = min(-P/(dP/dR), sqrt(P/G\rho^2)) (Eggleton 71 approx.)
-			#nabla_terms["c_s_st"] = (agrav_eff*delta*H_P/8.)**0.5					# c_s = sqrt(g*delta*H_P/8) (Comparing Stevenson 79 to K&W MLT)
+			#nabla_terms["c_s_st"] = (agrav_eff*delta*H_P)**0.5					# c_s = sqrt(g*delta*H_P/8) (Comparing Stevenson 79 to K&W MLT)
 
-			nabla_terms["v_conv_st"] = (0.25*delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
+			nabla_terms["v_conv_st"] = (delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
 
 			if omega == 0.:
 				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2
@@ -449,3 +444,46 @@ class mhs_steve(maghydrostar):
 			isotherm = False
 
 		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms, isotherm]
+
+
+########################################### POSTPROCESSING FUNCTIONS #############################################
+
+	def getconvection(self, togglecoulomb=True, fresh_calc=False):
+		"""Obtains convective structure, calculated using a combination of Eqn. 9 of Piro & Chang 08 and modified mixing length theory (http://adama.astro.utoronto.ca/~cczhu/runawaywiki/doku.php?id=magderiv#modified_limiting_cases_of_convection).  Currently doesn't account for magnetic energy in any way, so may not be consistent with MHD stars.
+		"""
+
+		# Obtain energies and additional stuff
+		if fresh_calc or not self.data.has_key("Epot"):
+			self.getenergies()
+
+		if fresh_calc or not self.data.has_key("dy"):
+			self.getgradients()
+
+		R = np.array(self.data["R"])
+		R[0] = max(1e-30, R[0])
+		dPdr = self.data["dy"][:,1]/self.data["dy"][:,0]
+		self.data["agrav"] = -dPdr/self.data["rho"]			# used to just be self.grav*self.data["M"]/R**2; now this is "agrav_norot" below
+		self.data["agrav_norot"] = self.grav*self.data["M"]/R**2
+		self.data["H_P"] = -self.data["Pgas"]/dPdr			# Assuming this is the GAS-ONLY SCALE HEIGHT!
+		self.data["H_P"][0] = self.data["H_P"][1]			# Removing singularity at zero
+		HPred = (self.data["Pgas"]/self.grav/self.data["rho"]**2)**0.5	# Reduced version that includes damping of H_P near r = 0; used for nabla calculations in derivatives
+		self.data["H_Preduced"] = np.array(self.data["H_P"])
+		self.data["H_Preduced"][HPred/self.data["H_P"] <= 1] = HPred[HPred/self.data["H_P"] <= 1]
+
+		# obtain epsilon_nuclear from Marten's MESA tables
+		self.data["eps_nuc"] = np.zeros(len(self.data["rho"]))
+		td = rtc.timescale_data(max_axes=[1e12,1e12])
+		eps_nuc_interp = td.getinterp2d("eps_nuc")
+		for i in range(len(self.data["eps_nuc"])):
+			self.data["eps_nuc"][i] = eps_nuc_interp(self.data["rho"][i], self.data["T"][i])
+
+		# obtain convective luminosity
+		self.data["Lnuc"] = 4.*np.pi*scipyinteg.cumtrapz(self.data["eps_nuc"]*R**2*self.data["rho"], x=R, initial=0.)
+		self.data["Lconv"] = self.data["Lnuc"]*(1. - self.data["Eth"]/max(self.data["Eth"])*max(self.data["Lnuc"])/self.data["Lnuc"])
+		self.data["Lconv"][0] = 0.
+		self.data["Fnuc"] = self.data["Lnuc"]/4./np.pi/R**2
+		self.data["Fconv"] = self.data["Lconv"]/4./np.pi/R**2
+		self.data["vconv"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
+		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
+		self.data["vnuc"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
+		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])

@@ -1145,7 +1145,7 @@ class maghydrostar:
 		del self.data["nabla_terms"]	#delete nabla_terms to remove duplicate copies
 
 
-########################################### ANALYSIS FUNCTIONS #############################################
+########################################### POSTPROCESSING FUNCTIONS #############################################
 
 
 	def weightedavg(self, item, kind="mass"):
@@ -1246,7 +1246,7 @@ class maghydrostar:
 		"""Obtains convective structure, calculated using a combination of Eqn. 9 of Piro & Chang 08 and modified mixing length theory (http://adama.astro.utoronto.ca/~cczhu/runawaywiki/doku.php?id=magderiv#modified_limiting_cases_of_convection).  Currently doesn't account for magnetic energy in any way, so may not be consistent with MHD stars.
 		"""
 
-		#Obtain energies and additional stuff
+		# Obtain energies and additional stuff
 		if fresh_calc or not self.data.has_key("Epot"):
 			self.getenergies()
 
@@ -1255,21 +1255,23 @@ class maghydrostar:
 
 		R = np.array(self.data["R"])
 		R[0] = max(1e-30, R[0])
-		self.data["agrav"] = self.grav*self.data["M"]/R**2
-		self.data["H_P"] = -self.data["Pgas"]*self.data["dy"][:,0]/self.data["dy"][:,1]	#Assuming this is the GAS-ONLY SCALE HEIGHT!
-		self.data["H_P"][0] = self.data["H_P"][1]					#Removing singularity at zero
-		HPred = (self.data["Pgas"]/self.grav/self.data["rho"]**2)**0.5	#Reduced version that includes damping of H_P near r = 0; used for nabla calculations in derivatives
+		dPdr = self.data["dy"][:,1]/self.data["dy"][:,0]
+		self.data["agrav"] = -dPdr/self.data["rho"]			# used to just be self.grav*self.data["M"]/R**2; now this is "agrav_norot" below
+		self.data["agrav_norot"] = self.grav*self.data["M"]/R**2
+		self.data["H_P"] = -self.data["Pgas"]/dPdr			# Assuming this is the GAS-ONLY SCALE HEIGHT!
+		self.data["H_P"][0] = self.data["H_P"][1]			# Removing singularity at zero
+		HPred = (self.data["Pgas"]/self.grav/self.data["rho"]**2)**0.5	# Reduced version that includes damping of H_P near r = 0; used for nabla calculations in derivatives
 		self.data["H_Preduced"] = np.array(self.data["H_P"])
 		self.data["H_Preduced"][HPred/self.data["H_P"] <= 1] = HPred[HPred/self.data["H_P"] <= 1]
 
-		#obtain epsilon_nuclear from Marten's MESA tables
+		# obtain epsilon_nuclear from Marten's MESA tables
 		self.data["eps_nuc"] = np.zeros(len(self.data["rho"]))
 		td = rtc.timescale_data(max_axes=[1e12,1e12])
 		eps_nuc_interp = td.getinterp2d("eps_nuc")
 		for i in range(len(self.data["eps_nuc"])):
 			self.data["eps_nuc"][i] = eps_nuc_interp(self.data["rho"][i], self.data["T"][i])
 
-		#obtain convective luminosity
+		# obtain convective luminosity
 		self.data["Lnuc"] = 4.*np.pi*scipyinteg.cumtrapz(self.data["eps_nuc"]*R**2*self.data["rho"], x=R, initial=0.)
 		self.data["Lconv"] = self.data["Lnuc"]*(1. - self.data["Eth"]/max(self.data["Eth"])*max(self.data["Lnuc"])/self.data["Lnuc"])
 		self.data["Lconv"][0] = 0.
@@ -1280,17 +1282,17 @@ class maghydrostar:
 		self.data["vnuc"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
 
-		# Obtain Woosley, Wunch & Kuhlen 2004 Eqn. 36. integral
-		dTdr = self.data["T"]/self.data["Pgas"]*self.data["nabla_mhdr"]*self.data["dy"][:,1]/self.data["dy"][:,0]
-		self.data["WWK04_integral"] = scipyinteg.cumtrapz(dTdr + self.data["eps_nuc"]/self.data["cP"]/self.data["vconv"], x=self.data["R"], initial=0.)
-
 
 	def gettimescales(self, fresh_calc=False):
-		"""Obtains timescales for convective transport, central nuclear burning, etc.
+		"""Obtains WWK04 integral and relevant timescales for convective transport, central nuclear burning, etc.
 		"""
 
 		if fresh_calc or not self.data.has_key("vnuc"):
 			self.getconvection(fresh_calc=fresh_calc)
+
+		# Obtain Woosley, Wunch & Kuhlen 2004 Eqn. 36. integral
+		dTdr = self.data["T"]/self.data["Pgas"]*self.data["nabla_mhdr"]*self.data["dy"][:,1]/self.data["dy"][:,0]
+		self.data["WWK04_integral"] = scipyinteg.cumtrapz(dTdr + self.data["eps_nuc"]/self.data["cP"]/self.data["vconv"], x=self.data["R"], initial=0.)
 
 		self.data["tau_cc"] = self.data["cP"]*self.data["T"]/self.data["eps_nuc"]								# Nuclear burning timescale
 		self.data["t_blob"] = scipyinteg.cumtrapz(1./self.data["vconv"], x=self.data["R"], initial=0.)			# Blob travel time from r = 0 to r = R_WD
