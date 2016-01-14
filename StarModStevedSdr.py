@@ -206,18 +206,15 @@ class mhs_steve(maghydrostar):
 		while P > Pend:
 
 			# Adaptive stepsize
+			y_in = np.array([R, P, temp])
+			# The only way to "self-consistently" print out B is in the derivative, where it could be modified to force B^2/Pgas to be below some critical value
 			if S_old_toggle:
-				y_in = np.array([R, P])
-				[dy, dTdm, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives_oS(y_in, M, omega, dens, temp, ps_eostol=ps_eostol, 
-																						m_step=stepsize, isotherm=isotherm, grad_full=True)
-				stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-35)))
-				dy = np.append(dy, np.array([dTdm]))
-
+				[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives_oS(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize,
+																						 isotherm=isotherm, grad_full=True)
 			else:
-				y_in = np.array([R, P, temp])
 				[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, self.fconv_data["Fconv_st"][-1],
 																		ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
-				stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-35)))
+			stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-35)))
 
 			if recordstar:
 				self.data["Pmag"].append(Pmag)
@@ -228,25 +225,22 @@ class mhs_steve(maghydrostar):
 				self.data["nabla_terms"].append(nabla_terms)
 
 			if S_old_toggle:
-				R, P = scipyinteg.odeint(self.derivatives_oS, y_in, np.array([M,M+stepsize]), 
-														args=(omega, dens, temp, errtrig, ps_eostol, stepsize, isotherm), 
+				R, P, temp = scipyinteg.odeint(self.derivatives_oS, y_in, np.array([M,M+stepsize]), 
+														args=(omega, errtrig, ps_eostol, stepsize, isotherm), 
 														h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
-				entropy = self.S_old(M + stepsize)
-				[dens, temp, gamma_dummy] = self.getdens_PS_est(P, entropy, failtrig=errtrig, dens_est=dens, temp_est=temp, eostol=ps_eostol)
-
 			else:
 				R, P, temp = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), 
 														args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, stepsize, isotherm), 
 														h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
 
-				[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
+			[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
 
 			if self.S_old and entropy <= self.S_old(M + stepsize) and not S_old_toggle:
 				R, P, temp, M = self.connect_S_old(y_in, M, stepsize, omega, Pend, errtrig, ps_eostol)
 				[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
 				S_old_toggle = True
 			elif temp <= self.mintemp and not isotherm:
-				R, P, temp, M = self.connect_isotherm(y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, S_old_toggle, denstempest=[dens, temp])
+				R, P, temp, M = self.connect_isotherm(y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, S_old_toggle)
 				[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
 				isotherm = True
 			else:
@@ -286,21 +280,17 @@ class mhs_steve(maghydrostar):
 				break
 
 		# Step outward one last time
+		y_in = np.array([R, P, temp])
 		if S_old_toggle:
-			y_in = np.array([R, P])
-			[dy, dTdm, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives_oS(y_in, M, omega, dens, temp, ps_eostol=ps_eostol, 
-																					m_step=stepsize, isotherm=isotherm, grad_full=True)
-			dy_export = np.append(dy, np.array([dTdm]))
+			[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives_oS(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
 		else:
-			y_in = np.array([R, P, temp])
 			[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, self.fconv_data["Fconv_st"][-1], ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
-			dy_export = np.array(dy)
 
 		# Generate a fake data point where M is exactly mass_want.  Useful for setting initial conditions for 3D WD simulations.
 		if recordstar:
 			self.data["Pmag"].append(Pmag)
 			self.data["B"].append(Bfld)
-			self.data["dy"] = np.append(self.data["dy"], dy_export.reshape((1,3)), 0)
+			self.data["dy"] = np.append(self.data["dy"], dy.reshape((1,3)), 0)
 			self.data["nabla_hydro"].append(hydrograd)
 			self.data["nabla_mhdr"].append(totalgrad) 
 			self.data["nabla_terms"].append(nabla_terms) 
@@ -308,9 +298,7 @@ class mhs_steve(maghydrostar):
 			if self.fakeouterpoint:
 				stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-30)))
 				if S_old_toggle:
-					y_out = scipyinteg.odeint(self.derivatives_oS, y_in, np.array([M,M+stepsize]), 
-														args=(omega, dens, temp, errtrig, ps_eostol, stepsize, isotherm), 
-														h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
+					y_out = scipyinteg.odeint(self.derivatives_oS, y_in, np.array([M,M+stepsize]), args=(omega, errtrig, ps_eostol, stepsize, isotherm), h0=stepsize*0.01, hmax = stepsize)[1,:]
 				else:
 					y_out = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, stepsize, isotherm), h0=stepsize*0.01, hmax = stepsize)[1,:]
 				self.advanceFconv(0., y_out[0], 0., M+stepsize, Mstep)
@@ -343,7 +331,7 @@ class mhs_steve(maghydrostar):
 			return M
 
 
-	def connect_isotherm(self, y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, S_old_toggle, denstempest=[1e6,1e7], iter_max=1000, subtol=1e-8):
+	def connect_isotherm(self, y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, S_old_toggle, iter_max=1000, subtol=1e-8):
 		"""
 		Stevenson 1979-compatible loop to achieve self.mintemp within tolerance self.mintemp_reltol.
 		"""
@@ -352,21 +340,12 @@ class mhs_steve(maghydrostar):
 		P = ys_in[1]
 		sM = M
 		i = 0
-
-		if S_old_toggle:
-			dens = denstempest[0]
-			temp = denstempest[1]
-
 		while i < iter_max and P > Pend and abs(substep) > subtol*stepsize:			# Integrate forward toward self.mintemp
 
 			if S_old_toggle:
-
-				R, P = scipyinteg.odeint(self.derivatives_oS, ys_in, np.array([sM,sM+substep]), 
-												args=(omega, dens, temp, errtrig, ps_eostol, substep, False), 
+				R, P, temp = scipyinteg.odeint(self.derivatives_oS, ys_in, np.array([sM,sM+substep]), 
+												args=(omega, errtrig, ps_eostol, substep, False), 
 												h0=substep*0.01, hmax = substep, mxstep=1000)[1,:]
-				entropy = self.S_old(sM+substep)
-				[dens, temp, gamma_dummy] = self.getdens_PS_est(P, entropy, failtrig=errtrig, dens_est=dens, temp_est=temp, eostol=ps_eostol)
-
 			else:
 				R, P, temp = scipyinteg.odeint(self.derivatives, ys_in, np.array([sM,sM+substep]), 
 												args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, substep, 
@@ -380,18 +359,12 @@ class mhs_steve(maghydrostar):
 
 			# If we've overshot
 			if temp < self.mintemp:
-				if S_old_toggle:
-					R, P = np.array(ys_in)
-				else:
-					R, P, temp = np.array(ys_in)	# reset R, P, temp to start of step
+				R, P, temp = np.array(ys_in)	# reset R, P, temp to start of step
 				sM -= substep					# reverse mass step
 				substep = 0.1*substep			# repeat last integration step with greater accuracy
 
 			# If we've done neither, set up next integration
-			if S_old_toggle:
-				ys_in = np.array([R, P])
-			else:
-				ys_in = np.array([R, P, temp])
+			ys_in = np.array([R, P, temp])
 				
 		return [R, P, temp, sM]
 
@@ -554,15 +527,16 @@ class mhs_steve(maghydrostar):
 		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms, dy_est, isotherm]
 
 
-	def derivatives_oS(self, y, mass, omega, dens_est, temp_est, failtrig=[-100], ps_eostol=1e-8, m_step=1e29, isotherm=False, grad_full=False):
+	def derivatives_oS(self, y, mass, omega, failtrig=[-100], ps_eostol=1e-8, m_step=1e29, isotherm=False, grad_full=False):
 		"""
 		Derivative that replaces standard derivative when S(m) < S_old(m)
 		"""
 
 		R = y[0]
 		press = y[1]
+		temp = y[2]
 
-		[dens, temp, gamma_dummy] = self.getdens_PS_est(press, self.S_old(mass), failtrig=failtrig, dens_est=dens_est, temp_est=temp_est, eostol=ps_eostol)
+		[dens, entropy] = self.getdens_PT(press, temp, failtrig=failtrig)
 
 		Bfld = self.magf.fBfld(R, mass)
 		Pchi = (1./8./np.pi)*Bfld**2
@@ -570,7 +544,7 @@ class mhs_steve(maghydrostar):
 		# Take mag pressure Pchi = 0 for calculating hydro coefficients
 		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s] = self.geteosgradients(dens, temp, 0.0, failtrig=failtrig)
 
-		dydx = np.zeros(2)
+		dydx = np.zeros(3)
 		dydx[0] = 1./(4.*np.pi*R**2.*dens)
 		dptotaldm = -self.grav*mass/(4.*np.pi*R**4.) + 1./(6.*np.pi)*omega**2/R
 		dydx[1] = dptotaldm 	#- Pchi_grad*dydx[0]
@@ -592,10 +566,11 @@ class mhs_steve(maghydrostar):
 		if self.nablarat_crit and (abs(nabla_terms["nd"])/hydrograd > self.nablarat_crit):
 			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
 
+		totalgrad = hydrograd + nabla_terms["nd"]
+		dydx[2] = temp/press*totalgrad*dydx[1]
+
 		if grad_full:
-			totalgrad = hydrograd + nabla_terms["nd"]
-			dTdm = temp/press*totalgrad*dydx[1]
-			return [dydx, dTdm, Bfld, Pchi, hydrograd, totalgrad, nabla_terms]
+			return [dydx, Bfld, Pchi, hydrograd, totalgrad, nabla_terms]
 		else:
 			return dydx
 
@@ -638,7 +613,7 @@ class mhs_steve(maghydrostar):
 		if fresh_calc or not self.data.has_key("Epot"):
 			self.getenergies()
 
-		if fresh_calc or not self.data.has_key("gamma_ad"):
+		if fresh_calc or not self.data.has_key("dy"):
 			self.getgradients()
 
 		R = np.array(self.data["R"])
