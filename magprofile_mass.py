@@ -13,17 +13,24 @@ class magprofile:
 
 	Parameters
 	----------
-	radius - radius
-	mass - mass
-	Bfld - B(r) profile
-	filename - read profile from file (class constructor will not read radius 
+	radius : radius
+	mass : mass
+	Bfld : B(r) profile
+	filename : read profile from file (class constructor will not read radius 
 		or Bfld in that case)
-	smooth - smooth profile before using it for interpolation
-	method - either "spline", "pwr" or "brokenpwr"
-	bpargs - list of two arrays, each denoting the radius range for fitting each segment of the broken power law; by default, [np.array([1e6,2e8]), np.array([8e8, 1e10])]
-	renorm - renormalize fit to central magnetic strength
-	checkposderiv - check Bfld derivative to always be positive
-	blankfunc - if true, returns a function with Bfld = 0, Bderiv = 0
+	smooth : smooth profile before using it for interpolation
+	method : either "spline", "pwr" or "brokenpwr"
+	bpargs : list of two arrays, each denoting the radius range for fitting each 
+		segment of the broken power law; by default, 
+		[np.array([1e6,2e8]), np.array([8e8, 1e10])]
+	min_r : minimum radius for spline interpolant (to prevent singularities at
+		r = 0)
+	spline_k : UnivariateSpline degree of smoothing spline (k must be <=5)
+	spline_s : UnivariateSpline positive smoothing factor used to choose 
+		number of knots
+	renorm : renormalize fit to central magnetic strength
+	checkposderiv : check Bfld derivative to always be positive
+	blankfunc : if true, returns a function with Bfld = 0, Bderiv = 0
 	"""
 #	gamma - defined in Feiden & Chaboyer 12 as a geometric correction to the 
 #		magnetic pressure, i.e. Pchi = (gamma - 1)B^2/8/pi.  Defaults to 4./3. 

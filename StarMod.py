@@ -1233,10 +1233,7 @@ class maghydrostar:
 #			self.data["B_natural"][i] = self.magf.fBfld(self.data["R"][i], self.data["M"][i])
 #			self.data["Pmag_natural"][i] = (1./8./np.pi)*self.magf.fBfld(self.data["R"][i], self.data["M"][i])**2	#Get what user wants B(r) to be
 			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
-			try:
-				[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
-			except:
-				[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, self.fconv_data["Fconv_st"][i], m_step=m_step[i], grad_full=True)
+			[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
 			[adgradred, hydrograd, self.data["nu"][i], self.data["alpha"][i], self.data["delta"][i], self.data["gamma_ad"][i], self.data["cP"][i], cPydro_dumm, c_s_dumm] = self.geteosgradients(self.data["rho"][i], self.data["T"][i], Pmag)
 			self.data["nabla_ad"][i] = (self.data["Pgas"][i] + Pmag)/self.data["T"][i]*adgradred
 		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
