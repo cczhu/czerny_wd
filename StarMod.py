@@ -1274,9 +1274,9 @@ class maghydrostar:
 		self.data["Lconv"][0] = 0.
 		self.data["Fnuc"] = self.data["Lnuc"]/4./np.pi/R**2
 		self.data["Fconv"] = self.data["Lconv"]/4./np.pi/R**2
-		self.data["vconv"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
+		self.data["vconv"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
 		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
-		self.data["vnuc"] = (0.25*self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
+		self.data["vnuc"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
 
 
