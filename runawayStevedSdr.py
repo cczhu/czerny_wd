@@ -1,4 +1,4 @@
-import StarModSteve as Star
+import StarModStevedSdr as Star
 import magprofile_mass as magprof
 import rhoTcontours as rtc
 import numpy as np

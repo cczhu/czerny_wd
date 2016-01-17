@@ -20,7 +20,10 @@ class entropy_profile:
 	filename : read profile from file (class constructor will not read radius 
 		or Bfld in that case)
 	smooth : smooth profile before using it for interpolation
-	spline_k : UnivariateSpline degree of smoothing spline (k must be <=5)
+	spline_k : UnivariateSpline degree of smoothing spline (k must be <=5).  See
+		http://docs.scipy.org/doc/scipy-0.16.1/reference/generated/
+		scipy.interpolate.UnivariateSpline.html for more.
+	spline_ext : UnivariateSpline boundary control
 	mass_cut : mass cutoff for input entropy and mass curves used to produce
 		interpolated S_old function.  UnivariateSpline uses a derivative-based
 		outer bundary Sometimes necessary due to the extreme
@@ -30,9 +33,10 @@ class entropy_profile:
 	"""
 
 	def __init__(self, mass, Sgas, vconv, filename=False, smooth=False,
-					spline_k=3, mass_cut=0.99, blankfunc=False):
+					spline_k=3, spline_ext="const", mass_cut=1., blankfunc=False):
 
 		self.spline_k = spline_k
+		self.spline_ext = spline_ext
 		self.mass_cut = mass_cut
 #		self.spline_s = spline_s
 
@@ -73,9 +77,9 @@ class entropy_profile:
 		"""Cubic spline interpolation of entropy and convective velocity.
 		"""
 		want = self.mass < max(self.mass)*self.mass_cut
-		S_old = UnivariateSpline(self.mass[want], self.Sgas[want], k=self.spline_k)
+		S_old = UnivariateSpline(self.mass[want], self.Sgas[want], k=self.spline_k, ext=self.spline_ext)
 		dS_old = S_old.derivative()
-		vconv_Sold = UnivariateSpline(self.mass[want], self.vconv[want], k=self.spline_k)
+		vconv_Sold = UnivariateSpline(self.mass[want], self.vconv[want], k=self.spline_k, ext=self.spline_ext)
 		return [S_old, dS_old, vconv_Sold] 
 
 

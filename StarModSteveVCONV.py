@@ -7,7 +7,6 @@ import myhelm_magstar as myhmag
 import rhoTcontours as rtc
 from StarMod import maghydrostar
 import magprofile_mass as magprof
-import Sprofile_mass as sprof
 
 ################EndSimmer CLASS###############################
 
@@ -18,7 +17,6 @@ class mhs_steve(maghydrostar):
 	(http://cococubed.asu.edu/code_pages/eos.shtml) EOS, rigid rotation 
 	spherical approximation based on Stevenson 1979 and Barker et al. 2014.  
 	All values in CGS.
-
 	Parameters
 	----------
 	mass : wanted mass (g)
@@ -39,10 +37,12 @@ class mhs_steve(maghydrostar):
 		Default is set to 1e-10 to prevent it from ever being reached.  
 		Helmholtz sometimes has trouble below this 1e-8; try adjusting this
 		value to eliminate inverter errors.
-	S_old : entropy profile spline (with respect to mass m) of previous star 
-		along runaway track; in cases of extreme convective velocity, switch 
-		to using steve_oS derivative functions when calculated entropy profile 
-		drops below S_old(m).
+	simd_userot : use Solberg-Hoiland deviation from adiabatic temperature 
+		gradient.
+	simd_usegammavar : use gamma = c_P/c_V index magnetic deviation from 
+		adiabatic temperature gradient.
+	simd_usegrav : use gravity magnetic devation from adiabatic temperature 
+		gradient.
 	densest : central density initial estimate for self.getstarmodel().
 	omegaest : estimate of rigid rotating angular speed.  Default is False
 		- code wil then use 0.75*mystar.L_want/I.
@@ -54,58 +54,46 @@ class mhs_steve(maghydrostar):
 		absolute error tolerance for maximum omega.
 	verbose : report happenings within code.
 	dontintegrate: don't perform any integration
-
-
 	Returns
 	-------
 	mystar : mhs_steve class instance
 		If star was integrated and data written, results can be found in
 		mystar.data.  Further analysis can be performed with 
 		mystar.getenergies,	mystar.getgradients and mystar.getconvection.
-
-
 	Notes
 	-----
 	Child class of maghydrostar, since most of the machinery used to run these
 	models is identical to those in maghydrostar.  getstarmodel, 
 	getrotatingstarmodel and getmaxomega all work with this class.  
 	See StarMod.py for further documentation.
-
 	Examples
 	--------
 	See examples in StarMod.py - command syntax is identica.
 	"""
 
 	def __init__(self, mass, S_want, magprofile=False, omega=0., Lwant=0., 
-				temp_c=False, mintemp=1e5, stop_mindenserr=1e-10, S_old=False,
+				temp_c=False, mintemp=1e4, stop_mindenserr=1e-10,
+				simd_userot=True, simd_usegammavar=False, simd_usegrav=False,
 				densest=False, omegaest=False, mass_tol=1e-6, L_tol=1e-6, 
 				omega_crit_tol=1e-3, verbose=True, dontintegrate=False,
 				**kwargs):
 
 		td = rtc.timescale_data(max_axes=[1e12,1e12])
 		self.eps_nuc_interp = td.getinterp2d("eps_nuc")
-		if S_old:
-			self.populateS_old(S_old)
-		else:
-			self.S_old = False
-		if self.S_old and verbose:
-			print "S_old defined!  Will use old entropy profile if new one dips below it."
-
-		self.S_old_reltol = 1e-6
 
 		# maghydrostar class initialization: DONTINTEGRATE MUST BE SET
 		# TO TRUE FOR CURRENT CODE TO WORK!
 		maghydrostar.__init__(self, mass, temp_c, magprofile=magprofile, 
 				omega=omega, Lwant=Lwant, S_want=S_want, mintemp=mintemp, 
 				derivtype="sim", stop_mindenserr=stop_mindenserr, 
-				simd_userot=False, simd_usegammavar=False, 
-				simd_usegrav=False, densest=densest, omegaest=omegaest, 
+				simd_userot=simd_userot, simd_usegammavar=simd_usegammavar, 
+				simd_usegrav=simd_usegrav, densest=densest, omegaest=omegaest, 
 				mass_tol=mass_tol, L_tol=L_tol, omega_crit_tol=omega_crit_tol,
 				dontintegrate=True, verbose=verbose, **kwargs)
 
 		self.derivatives = self.derivatives_steve
 		self.first_deriv = self.first_derivatives_steve
-		if self.verbose:		# self.verbose is implicitly defined in maghydrostar
+		if self.verbose:
 			print "Replacing derivatives_gtsh with derivatives_steve!"
 
 		if dontintegrate:
@@ -122,20 +110,11 @@ class mhs_steve(maghydrostar):
 					self.getstarmodel(densest=densest, S_want=S_want)
 
 
-	def populateS_old(self, S_old):
-		"""Records user-defined entropy profile into class.
-		"""
-		self.S_old = S_old.S_old
-		self.dS_old = S_old.dS_old
-		self.vconv_Sold = S_old.vconv_Sold
-
-
 	def integrate_star(self, dens_c, temp_c, omega, recordstar=False, P_end_ratio=1e-8, ps_eostol=1e-8, outputerr=False):
 		"""
 		ODE solver that generates stellar profile given a central density dens_c, central 
 		temperature temp_c, and solid-body angular speed omega.  Uses Stevenson 1979
 		convection model.  All arguments not listed below are same as in __init__().
-
 		Parameters
 		----------
 		dens_c : central density (g/cm^3)
@@ -166,7 +145,7 @@ class mhs_steve(maghydrostar):
 			"B": [],
 			"nabla_hydro": [],
 			"nabla_mhdr": [],
-			"nabla_terms": []}	# dy not listed here
+			"nabla_terms": []}
 
 		errtrig = [0]		# Errortrig to stop integrator when Helmholtz NR-method fails to properly invert the EOS (usually due to errors slightly beyond tolerance)
 
@@ -179,7 +158,7 @@ class mhs_steve(maghydrostar):
 		# Take one step forward (we know the central values, and we assume dP_chi/dr = 0), assuming the central density does not change significantly
 		# first_deriv also returns the starting value of isotherm
 		M = stepsize
-		R, P, temp, Bfld, Pmag, hydrograd, totalgrad, nabla_terms, dy, isotherm = self.first_deriv(
+		R, P, temp, Bfld, Pmag, hydrograd, totalgrad, nabla_terms, isotherm = self.first_deriv(
 																				dens, M, Pc, temp, omega, failtrig=errtrig)
 		[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
 		self.advanceFconv(dens, R, temp, M, stepsize)
@@ -199,64 +178,40 @@ class mhs_steve(maghydrostar):
 			self.data["rho"].append(dens)
 			self.data["T"].append(temp)
 			self.data["Sgas"].append(entropy)
-			self.data["Pmag"].append(Pmag)			# Pmag, B, etc, for first step calculated
+			self.data["Pmag"].append(Pmag)	# Pmag, B, etc, 
 			self.data["B"].append(Bfld)
-			self.data["dy"] = dy.reshape((1,3))
 			self.data["nabla_hydro"].append(hydrograd)
 			self.data["nabla_mhdr"].append(totalgrad)
 			self.data["nabla_terms"].append(nabla_terms)
-
-		S_old_toggle = False
 
 		# Continue stepping using scipy.integrate.odeint
 		while P > Pend:
 
 			# Adaptive stepsize
-			if S_old_toggle:
-				y_in = np.array([R, P])
-				[dy, dTdm, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives_oS(y_in, M, omega, dens, temp, ps_eostol=ps_eostol, 
-																						m_step=stepsize, isotherm=isotherm, grad_full=True)
-				stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-35)))
-				dy = np.append(dy, np.array([dTdm]))
-
-			else:
-				y_in = np.array([R, P, temp])
-				[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, self.fconv_data["Fconv_st"][-1],
+			y_in = np.array([R, P, temp])
+			# The only way to "self-consistently" print out B is in the derivative, where it could be modified to force B^2/Pgas to be below some critical value
+			[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, self.fconv_data["Fconv_st"][-1],
 																		ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
-				stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-35)))
+			stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-35)))
 
 			if recordstar:
 				self.data["Pmag"].append(Pmag)
 				self.data["B"].append(Bfld)
-				self.data["dy"] = np.append(self.data["dy"], dy.reshape((1,3)), 0)
 				self.data["nabla_hydro"].append(hydrograd)
 				self.data["nabla_mhdr"].append(totalgrad)
 				self.data["nabla_terms"].append(nabla_terms)
 
-			if S_old_toggle:
-				R, P = scipyinteg.odeint(self.derivatives_oS, y_in, np.array([M,M+stepsize]), 
-														args=(omega, dens, temp, errtrig, ps_eostol, stepsize, isotherm), 
-														h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
-				entropy = self.S_old(M + stepsize)
-				[dens, temp, gamma_dummy] = self.getdens_PS_est(P, entropy, failtrig=errtrig, dens_est=dens, temp_est=temp, eostol=ps_eostol)
+			R, P, temp = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), 
+												args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, stepsize, isotherm), 
+												h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
 
-			else:
-				R, P, temp = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), 
-														args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, stepsize, isotherm), 
-														h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
-
-				[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
-
-			if self.S_old and entropy <= self.S_old(M + stepsize) and not S_old_toggle:
-				R, P, temp, M = self.connect_S_old(y_in, M, stepsize, omega, Pend, errtrig, ps_eostol)
-				[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
-				S_old_toggle = True
-			elif temp <= self.mintemp and not isotherm:
-				R, P, temp, M = self.connect_isotherm(y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, S_old_toggle, denstempest=[dens, temp])
-				[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
+			if temp <= self.mintemp and not isotherm:
+				R, P, temp, M = self.connect_isotherm(y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, isotherm)
 				isotherm = True
 			else:
 				M += stepsize
+
+			[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
 
 			self.advanceFconv(dens, R, temp, M, stepsize)
 
@@ -292,33 +247,20 @@ class mhs_steve(maghydrostar):
 				break
 
 		# Step outward one last time
-		if S_old_toggle:
-			y_in = np.array([R, P])
-			[dy, dTdm, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives_oS(y_in, M, omega, dens, temp, ps_eostol=ps_eostol, 
-																					m_step=stepsize, isotherm=isotherm, grad_full=True)
-			dy_export = np.append(dy, np.array([dTdm]))
-		else:
-			y_in = np.array([R, P, temp])
-			[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, self.fconv_data["Fconv_st"][-1], ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
-			dy_export = np.array(dy)
+		y_in = np.array([R, P, temp])
+		[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, self.fconv_data["Fconv_st"][-1], ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
 
 		# Generate a fake data point where M is exactly mass_want.  Useful for setting initial conditions for 3D WD simulations.
 		if recordstar:
 			self.data["Pmag"].append(Pmag)
 			self.data["B"].append(Bfld)
-			self.data["dy"] = np.append(self.data["dy"], dy_export.reshape((1,3)), 0)
 			self.data["nabla_hydro"].append(hydrograd)
 			self.data["nabla_mhdr"].append(totalgrad) 
 			self.data["nabla_terms"].append(nabla_terms) 
 
 			if self.fakeouterpoint:
 				stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-30)))
-				if S_old_toggle:
-					y_out = scipyinteg.odeint(self.derivatives_oS, y_in, np.array([M,M+stepsize]), 
-														args=(omega, dens, temp, errtrig, ps_eostol, stepsize, isotherm), 
-														h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
-				else:
-					y_out = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, stepsize, isotherm), h0=stepsize*0.01, hmax = stepsize)[1,:]
+				y_out = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, stepsize, isotherm), h0=stepsize*0.01, hmax = stepsize)[1,:]
 				self.advanceFconv(0., y_out[0], 0., M+stepsize, Mstep)
 				self.data["M"].append(max(self.mass_want, M+stepsize))
 				self.data["R"].append(y_out[0])
@@ -327,13 +269,9 @@ class mhs_steve(maghydrostar):
 				self.data["T"].append(0.)
 				self.data["Sgas"].append(0.)
 				y_in = y_out	# Gradients one last time
-				if S_old_toggle:
-					[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives_oS(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
-				else:
-					[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, self.fconv_data["Fconv_st"][-1], ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
+				[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, self.fconv_data["Fconv_st"][-1], ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
 				self.data["Pmag"].append(Pmag)
 				self.data["B"].append(Bfld)
-				self.data["dy"] = np.append(self.data["dy"], dy.reshape((1,3)), 0)
 				self.data["nabla_hydro"].append(hydrograd)
 				self.data["nabla_mhdr"].append(totalgrad)
 				self.data["nabla_terms"].append(nabla_terms)
@@ -349,7 +287,7 @@ class mhs_steve(maghydrostar):
 			return M
 
 
-	def connect_isotherm(self, y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, S_old_toggle, denstempest=[1e6,1e7], iter_max=1000, subtol=1e-8):
+	def connect_isotherm(self, y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, isotherm, iter_max=1000, subtol=1e-8):
 		"""
 		Stevenson 1979-compatible loop to achieve self.mintemp within tolerance self.mintemp_reltol.
 		"""
@@ -358,25 +296,10 @@ class mhs_steve(maghydrostar):
 		P = ys_in[1]
 		sM = M
 		i = 0
-
-		if S_old_toggle:
-			dens = denstempest[0]
-			temp = denstempest[1]
-
 		while i < iter_max and P > Pend and abs(substep) > subtol*stepsize:			# Integrate forward toward self.mintemp
-
-			if S_old_toggle:
-
-				R, P = scipyinteg.odeint(self.derivatives_oS, ys_in, np.array([sM,sM+substep]), 
-												args=(omega, dens, temp, errtrig, ps_eostol, substep, False), 
-												h0=substep*0.01, hmax = substep, mxstep=1000)[1,:]
-				entropy = self.S_old(sM+substep)
-				[dens, temp, gamma_dummy] = self.getdens_PS_est(P, entropy, failtrig=errtrig, dens_est=dens, temp_est=temp, eostol=ps_eostol)
-
-			else:
-				R, P, temp = scipyinteg.odeint(self.derivatives, ys_in, np.array([sM,sM+substep]), 
+			R, P, temp = scipyinteg.odeint(self.derivatives, ys_in, np.array([sM,sM+substep]), 
 												args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, substep, 
-												False), h0=substep*0.01, hmax = substep, mxstep=1000)[1,:]
+												isotherm), h0=substep*0.01, hmax = substep, mxstep=1000)[1,:]
 
 			sM += substep
 
@@ -386,48 +309,6 @@ class mhs_steve(maghydrostar):
 
 			# If we've overshot
 			if temp < self.mintemp:
-				if S_old_toggle:
-					R, P = np.array(ys_in)
-				else:
-					R, P, temp = np.array(ys_in)	# reset R, P, temp to start of step
-				sM -= substep					# reverse mass step
-				substep = 0.1*substep			# repeat last integration step with greater accuracy
-
-			# If we've done neither, set up next integration
-			if S_old_toggle:
-				ys_in = np.array([R, P])
-			else:
-				ys_in = np.array([R, P, temp])
-				
-		return [R, P, temp, sM]
-
-
-	def connect_S_old(self, y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, iter_max=1000, subtol=1e-8):
-		"""
-		Loop to achieve an entropy of self.S_old within tolerance self.S_old_reltol.
-		"""
-		substep = 0.1*stepsize			# we'll use constant stepsizes
-		ys_in = np.array(y_in)			# arrays are passed by reference, not by value!
-		P = ys_in[1]
-		sM = M
-		i = 0
-		while i < iter_max and P > Pend and abs(substep) > subtol*stepsize:			# Integrate forward toward self.mintemp
-
-			R, P, temp = scipyinteg.odeint(self.derivatives, ys_in, np.array([sM,sM+substep]), 
-											args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, substep, 
-											False), h0=substep*0.01, hmax = substep, mxstep=1000)[1,:]
-
-			[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
-
-			sM += substep
-
-			# If we're within the temperature tolerance
-			S_hit = self.S_old(sM)
-			if abs(entropy - S_hit)/S_hit < self.S_old_reltol:
-				break
-
-			# If we've overshot
-			if entropy < S_hit:
 				R, P, temp = np.array(ys_in)	# reset R, P, temp to start of step
 				sM -= substep					# reverse mass step
 				substep = 0.1*substep			# repeat last integration step with greater accuracy
@@ -465,10 +346,15 @@ class mhs_steve(maghydrostar):
 		for i in range(len_nabla):
 			for item in self.data["nabla_terms"][0].keys():
 				self.data[item][i] = self.data["nabla_terms"][i][item]
-		del self.data["nabla_terms"]	# delete nabla_terms to remove duplicate copies
+		del self.data["nabla_terms"]	#delete nabla_terms to remove duplicate copies
 
 
 	def unpack_Fconv(self):
+#		len_fconv = len(self.fconv_data["Lnuc_st"])
+#		for item in self.fconv_data.keys():
+#			self.data[item] = np.array(self.fconv_data[item])
+#		for item in self.fconv_data.keys():
+#			self.fconv_data[item] = np.array(self.fconv_data[item])
 		for item in self.fconv_data.keys():
 			self.data[item] = np.array(self.fconv_data[item])
 
@@ -497,7 +383,7 @@ class mhs_steve(maghydrostar):
 		if isotherm:
 
 			hydrograd = 0.		# Zero out hydrograd and deviation; totalgrad then will equal 0.
-			nabla_terms = {"v_conv_st": 0., "c_s_st": c_s, "nd": 0.}	# Populate deviations as zero
+			nabla_terms = {"vc_coeff_st": 0., "v_conv_st": 0., "c_s_st": c_s, "nd": 0.}	# Populate deviations as zero
 
 		else:
 
@@ -505,9 +391,12 @@ class mhs_steve(maghydrostar):
 
 			agrav_eff = -dptotaldm/dydx[0]/dens		# g_eff = -dP/dr/rho
 			H_P = min(-press*dydx[0]/dptotaldm, (press/self.grav/dens**2)**0.5)	# H_P = min(-P/(dP/dR), sqrt(P/G\rho^2)) (Eggleton 71 approx.)
-			#nabla_terms["c_s_st"] = (agrav_eff*H_P)**0.5					# c_s = sqrt(g*H_P) (Stevenson 79 sentence below Eqn. 37)
+			nabla_terms["c_s_st"] = (agrav_eff*H_P/8.)**0.5					# c_s = sqrt(g*delta*H_P/8) (Comparing Stevenson 79 to K&W MLT)
 
-			nabla_terms["v_conv_st"] = (delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
+			nabla_terms["v_conv_st"] = (0.25*delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
+			nabla_terms["vc_coeff_st"] = (0.25*delta*agrav_eff*H_P/cP/temp)**(1./3.)
+#			nabla_terms["v_conv_st"] = (Fconv/dens)**(1./3.) #(0.25*delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
+#			nabla_terms["vc_coeff_st"] = 1. #(0.25*delta*agrav_eff*H_P/cP/temp)**(1./3.)
 
 			if omega == 0.:
 				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2
@@ -542,7 +431,7 @@ class mhs_steve(maghydrostar):
 		#agrav_eff = -self.grav*M/R**2 + 2./3.*omega**2*R		# -Gm/r^2 + 2\Omega^2 r/3
 		#H_P = min(Pc*R/(Pc - P), (Pc/self.grav/dens**2)**0.5)	# H_P = -P/(dP/dR) = -Pc*(R - 0)/(P - Pc) = Pc*R/(Pc - P), or sqrt(P/G\rho^2) (Eggleton 71 approx.)
 
-		nabla_terms = {"v_conv_st": 0., "c_s_st": c_s, "nd": 0.}
+		nabla_terms = {"vc_coeff_st": 0., "v_conv_st": 0., "c_s_st": c_s, "nd": 0.}
 
 		totalgrad = hydrograd + nabla_terms["nd"]	# Curently nabla_terms["nd"] = 0
 
@@ -555,124 +444,4 @@ class mhs_steve(maghydrostar):
 		else:
 			isotherm = False
 
-		dy_est = np.array([R/M, (P - Pc)/M, (temp - Tc)/M])
-
-		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms, dy_est, isotherm]
-
-
-	def derivatives_oS(self, y, mass, omega, dens_est, temp_est, failtrig=[-100], ps_eostol=1e-8, m_step=1e29, isotherm=False, grad_full=False):
-		"""
-		Derivative that replaces standard derivative when S(m) < S_old(m)
-		"""
-
-		R = y[0]
-		press = y[1]
-
-		[dens, temp, gamma_dummy] = self.getdens_PS_est(press, self.S_old(mass), failtrig=failtrig, dens_est=dens_est, temp_est=temp_est, eostol=ps_eostol)
-
-		Bfld = self.magf.fBfld(R, mass)
-		Pchi = (1./8./np.pi)*Bfld**2
-
-		# Take mag pressure Pchi = 0 for calculating hydro coefficients
-		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s] = self.geteosgradients(dens, temp, 0.0, failtrig=failtrig)
-
-		dydx = np.zeros(2)
-		dydx[0] = 1./(4.*np.pi*R**2.*dens)
-		dptotaldm = -self.grav*mass/(4.*np.pi*R**4.) + 1./(6.*np.pi)*omega**2/R
-		dydx[1] = dptotaldm 	#- Pchi_grad*dydx[0]
-
-		if isotherm:
-
-			hydrograd = 0.		# Zero out hydrograd and deviation; totalgrad then will equal 0.
-			nabla_terms = {"v_conv_st": 0., "c_s_st": c_s, "nd": 0.}	# Populate deviations as zero
-
-		else:
-
-			nabla_terms = {"c_s_st": c_s}	# Populate deviations as zero
-			nabla_terms["v_conv_st"] = self.vconv_Sold(mass)
-
-			H_P = min(-press*dydx[0]/dptotaldm, (press/self.grav/dens**2)**0.5)	# H_P = min(-P/(dP/dR), sqrt(P/G\rho^2)) (Eggleton 71 approx.)
-
-			nabla_terms["nd"] = -H_P/cP*self.dS_old(mass)/dydx[0]	# ds/dr = ds/dm*dm/dr
-
-		if self.nablarat_crit and (abs(nabla_terms["nd"])/hydrograd > self.nablarat_crit):
-			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
-
-		if grad_full:
-			totalgrad = hydrograd + nabla_terms["nd"]
-			dTdm = temp/press*totalgrad*dydx[1]
-			return [dydx, dTdm, Bfld, Pchi, hydrograd, totalgrad, nabla_terms]
-		else:
-			return dydx
-
-
-########################################### POSTPROCESSING FUNCTIONS #############################################
-
-	def getgradients(self, togglecoulomb=True):
-		"""Obtains magnetohydrostatic gradients for diagnosing stellar structures.  Requires a profile to have already been made (but can be run on partially complete sets).
-		"""
-
-		len_arr = len(self.data["rho"])
-#		self.data["dy"] = np.zeros([len_arr,3])
-#		self.data["B_natural"] = np.zeros(len_arr)
-#		self.data["Pmag_natural"] = np.zeros(len_arr)
-		self.data["nabla_ad"] = np.zeros(len_arr)
-		self.data["nu"] = np.zeros(len_arr)
-		self.data["alpha"] = np.zeros(len_arr)
-		self.data["delta"] = np.zeros(len_arr)
-		self.data["gamma_ad"] = np.zeros(len_arr)
-		self.data["cP"] = np.zeros(len_arr)
-
-		#Calculate stepsizes
-		m_step = np.zeros(len_arr)
-		m_step[:-1] = self.data["M"][1:] - self.data["M"][:-1]
-		m_step[-1] = m_step[-2]
-
-		for i in range(len_arr):
-			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
-#			[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, self.fconv_data["Fconv_st"][i], m_step=m_step[i], grad_full=True)
-			[adgradred, hydrograd, self.data["nu"][i], self.data["alpha"][i], self.data["delta"][i], self.data["gamma_ad"][i], self.data["cP"][i], cPydro_dumm, c_s_dumm] = self.geteosgradients(self.data["rho"][i], self.data["T"][i], self.data["Pmag"][i])
-			self.data["nabla_ad"][i] = (self.data["Pgas"][i] + self.data["Pmag"][i])/self.data["T"][i]*adgradred
-		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
-
-
-	def getconvection(self, td=False, togglecoulomb=True, fresh_calc=False):
-		"""Obtains convective structure, calculated using a combination of Eqn. 9 of Piro & Chang 08 and modified mixing length theory (http://adama.astro.utoronto.ca/~cczhu/runawaywiki/doku.php?id=magderiv#modified_limiting_cases_of_convection).  Currently doesn't account for magnetic energy in any way, so may not be consistent with MHD stars.
-		"""
-
-		# Obtain energies and additional stuff
-		if fresh_calc or not self.data.has_key("Epot"):
-			self.getenergies()
-
-		if fresh_calc or not self.data.has_key("gamma_ad"):
-			self.getgradients()
-
-		R = np.array(self.data["R"])
-		R[0] = max(1e-30, R[0])
-		dPdr = self.data["dy"][:,1]/self.data["dy"][:,0]
-		self.data["agrav"] = -dPdr/self.data["rho"]			# used to just be self.grav*self.data["M"]/R**2; now this is "agrav_norot" below
-		self.data["agrav_norot"] = self.grav*self.data["M"]/R**2
-		self.data["H_P"] = -self.data["Pgas"]/dPdr			# Assuming this is the GAS-ONLY SCALE HEIGHT!
-		self.data["H_P"][0] = self.data["H_P"][1]			# Removing singularity at zero
-		HPred = (self.data["Pgas"]/self.grav/self.data["rho"]**2)**0.5	# Reduced version that includes damping of H_P near r = 0; used for nabla calculations in derivatives
-		self.data["H_Preduced"] = np.array(self.data["H_P"])
-		self.data["H_Preduced"][HPred/self.data["H_P"] <= 1] = HPred[HPred/self.data["H_P"] <= 1]
-
-		# obtain epsilon_nuclear from Marten's MESA tables
-		self.data["eps_nuc"] = np.zeros(len(self.data["rho"]))
-		if not td:
-			td = rtc.timescale_data(max_axes=[1e12,1e12])
-		eps_nuc_interp = td.getinterp2d("eps_nuc")
-		for i in range(len(self.data["eps_nuc"])):
-			self.data["eps_nuc"][i] = eps_nuc_interp(self.data["rho"][i], self.data["T"][i])
-
-		# obtain convective luminosity
-		self.data["Lnuc"] = 4.*np.pi*scipyinteg.cumtrapz(self.data["eps_nuc"]*R**2*self.data["rho"], x=R, initial=0.)
-		self.data["Lconv"] = self.data["Lnuc"]*(1. - self.data["Eth"]/max(self.data["Eth"])*max(self.data["Lnuc"])/self.data["Lnuc"])
-		self.data["Lconv"][0] = 0.
-		self.data["Fnuc"] = self.data["Lnuc"]/4./np.pi/R**2
-		self.data["Fconv"] = self.data["Lconv"]/4./np.pi/R**2
-		self.data["vconv"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
-		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
-		self.data["vnuc"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
-		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
+		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms, isotherm]

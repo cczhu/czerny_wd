@@ -99,6 +99,15 @@ class timescale_data:
 		return f
 
 
+	def get_tauneunuc_line(self):
+
+		T_zero = np.zeros(self.len_p[0])
+		for i in range(self.len_p[0]):
+			T_zero[i] = self.findzero(self.T_p,self.data_p["tau_eq_neunuc"][:,i])
+		f = interp.interp1d(self.rho_p, T_zero)
+		return f
+
+
 	@staticmethod
 	def make2Darray(x,y,z,xlenfull):
 		xlen = len(x)

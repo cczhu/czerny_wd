@@ -85,9 +85,7 @@ class mhs_steve(maghydrostar):
 		td = rtc.timescale_data(max_axes=[1e12,1e12])
 		self.eps_nuc_interp = td.getinterp2d("eps_nuc")
 		if S_old:
-			self.S_old = S_old.S_old
-			self.dS_old = S_old.dS_old
-			self.vconv_Sold = S_old.vconv_Sold
+			self.populateS_old(S_old)
 		else:
 			self.S_old = False
 		if self.S_old and verbose:
@@ -122,6 +120,14 @@ class mhs_steve(maghydrostar):
 					#self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, damp_nrstep=0.25)
 				else:
 					self.getstarmodel(densest=densest, S_want=S_want)
+
+
+	def populateS_old(self, S_old):
+		"""Records user-defined entropy profile into class.
+		"""
+		self.S_old = S_old.S_old
+		self.dS_old = S_old.dS_old
+		self.vconv_Sold = S_old.vconv_Sold
 
 
 	def integrate_star(self, dens_c, temp_c, omega, recordstar=False, P_end_ratio=1e-8, ps_eostol=1e-8, outputerr=False):
@@ -605,7 +611,7 @@ class mhs_steve(maghydrostar):
 		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
 
 
-	def getconvection(self, togglecoulomb=True, fresh_calc=False):
+	def getconvection(self, td=False, togglecoulomb=True, fresh_calc=False):
 		"""Obtains convective structure, calculated using a combination of Eqn. 9 of Piro & Chang 08 and modified mixing length theory (http://adama.astro.utoronto.ca/~cczhu/runawaywiki/doku.php?id=magderiv#modified_limiting_cases_of_convection).  Currently doesn't account for magnetic energy in any way, so may not be consistent with MHD stars.
 		"""
 
@@ -613,7 +619,7 @@ class mhs_steve(maghydrostar):
 		if fresh_calc or not self.data.has_key("Epot"):
 			self.getenergies()
 
-		if fresh_calc or not self.data.has_key("dy"):
+		if fresh_calc or not self.data.has_key("gamma_ad"):
 			self.getgradients()
 
 		R = np.array(self.data["R"])
@@ -629,7 +635,8 @@ class mhs_steve(maghydrostar):
 
 		# obtain epsilon_nuclear from Marten's MESA tables
 		self.data["eps_nuc"] = np.zeros(len(self.data["rho"]))
-		td = rtc.timescale_data(max_axes=[1e12,1e12])
+		if not td:
+			td = rtc.timescale_data(max_axes=[1e12,1e12])
 		eps_nuc_interp = td.getinterp2d("eps_nuc")
 		for i in range(len(self.data["eps_nuc"])):
 			self.data["eps_nuc"][i] = eps_nuc_interp(self.data["rho"][i], self.data["T"][i])
