@@ -33,6 +33,9 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	deltastepcoeff_rho = 0.1
 	deltastepcoeff_omega = 0.1
 	damp_nrstep = 0.25
+
+#	if i == 20:
+#		charles_says = stop_this
 	
 #	if r_in.has_key("L_original"):
 #		outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
@@ -43,21 +46,26 @@ def obtain_model(mystar, i, r_in, verbose=False):
 #			outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=0.5*omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
 #													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
 #													omega_warn=1.)
+
 	if r_in.has_key("L_original"):
-		outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+		outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
 													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
 		if outerr_code:
 			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH A LOWER OMEGA AND TIGHTER STEPPING---------------"
-			outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+			outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
 													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
 	else:
-		outerr_code = mystar.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+		outerr_code = mystar.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol,
+										deltastepcoeff=deltastepcoeff_rho)
+		if outerr_code:
+			print "-----------HACK - STAR OUTPUT FAILURE, TRYING AGAIN WITH A 5% INCREASE IN DENSITY ESTIMATE--------------------"
+			outerr_code = mystar.getstarmodel(densest=1.05*densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
 										deltastepcoeff=deltastepcoeff_rho)
 
 	return outerr_code
 
 
-def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), mintemp=1e5, S_old=False, mass_tol=1e-3, P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, omega_crit_tol=1e-2, omega_warn=10., verbose=True):
+def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), mintemp=1e5, S_old=False, mass_tol=1e-6, P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, omega_crit_tol=1e-3, omega_warn=10., verbose=True):
 	"""Obtains runaway of a star of some given mass, magnetic field, and rotation.  Outputs an object (usually several hundred megs large) that includes run inputs as "run_inputs", as well as all stellar output curves (hence its size) under "stars".
 
 	Arguments:
@@ -165,7 +173,7 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 		outerr_code = obtain_model(mystar, i, r_in, verbose=verbose)
 
 		if outerr_code:
-			print "===== RUNAWAY.PY REPORTS OUTERR: ", outerr_code, "so will stop model making! ====="
+			print "===== RUNAWAY.PY REPORTS OUTERR: ", outerr_code, "for star", i, "so will stop model making! ====="
 			break
 
 		if "R_nuc" not in mystar.data.keys():	# Obtain timescale info if it's not already printed.

@@ -135,7 +135,7 @@ class maghydrostar:
 	"""
 
 	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
-				S_want=False, mintemp=1e4, composition="CO", derivtype="sim",
+				S_want=False, mintemp=1e5, composition="CO", derivtype="sim",
 				simd_userot=True, simd_usegammavar=False, simd_usegrav=False, 
 				simd_suppress=False, nablarat_crit=False, P_end_ratio=1e-8, 
 				ps_eostol=1e-8, fakeouterpoint=False, stop_invertererr=True, 

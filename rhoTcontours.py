@@ -113,10 +113,8 @@ class timescale_data:
 		xlen = len(x)
 		ylen = len(y)
 		new = np.zeros((ylen,xlen))
-		i = 0
-		while i < ylen:
+		for i in range(ylen):
 			new[i,:] = z[i*xlenfull:i*xlenfull + xlen]  #i.e. new[y[i],x[i]] = z something; since in contour y is row # and x is col #
-			i += 1
 		return new
 
 
@@ -144,7 +142,6 @@ def get_timescale_lines(ax, td):
 	neur_N = [1e6, 1e4, 1e2, 1e0, 1e-2]
 	neur_clabel = [r'$\tau_{\nu}=10^6$',r'$10^4$',r'$10^2$',r'$10^0$',r'$10^{-2}$']
 
-	i = 0
 	for i in range(len(neur_N)):
 		cs = ax.contour(td.rho_p, td.T_p, td.data_p["tau_neu"], [neur_N[i]], colors='b', linestyles='dotted')
 		ax.clabel(cs, fontsize=14, inline=1, fmt=neur_clabel[i])	#inline_spacing = -50
@@ -152,20 +149,16 @@ def get_timescale_lines(ax, td):
 	nucr_N = [1e6, 1e4, 1e2, 1e0, 1e-2,1e-4,1e-6]
 	nucr_clabel = [r'$\tau_\mathrm{cc}=10^6$',r'$10^4$',r'$10^2$',r'$10^0$',r'$10^{-2}$',r'$10^{-4}$',r'$10^{-6}$']
 
-	i = 0
-	while i < len(nucr_N):
+	for i in range(len(nucr_N)):
 		cs = ax.contour(td.rho_p, td.T_p, td.data_p["tau_nuc"], [nucr_N[i]], colors='r', linestyles=':')
 		ax.clabel(cs, fontsize=14, inline=1, fmt=nucr_clabel[i])
-		i += 1
 
 	S_N = [1e8, 10**8.1, 10**8.2]
 	S_clabel = [r'$S = 10^8$',r'$10^{8.1}$',r'$10^{8.2}$']
 
-	i = 0
-	while i < len(S_N):
+	for i in range(len(S_N)):
 		cs = ax.contour(td.rho_p, td.T_p, td.data_p["S"], [S_N[i]], colors='g', linestyles='dotted', linewidth=4)
 		ax.clabel(cs, fontsize=14, inline=1, fmt=S_clabel[i])
-		i += 1
 
 	cs = ax.contour(td.rho_p, td.T_p, td.data_p["tau_eq_neunuc"], [0], colors='m', linestyles='-', linewidth=6)
 	ax.clabel(cs, fontsize=14, inline=1, fmt=r'$\tau_\mathrm{cc}=\tau_{\nu}$')

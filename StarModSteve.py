@@ -568,13 +568,18 @@ class mhs_steve(maghydrostar):
 		R = y[0]
 		press = y[1]
 
-		[dens, temp, gamma_dummy] = self.getdens_PS_est(press, self.S_old(mass), failtrig=failtrig, dens_est=dens_est, temp_est=temp_est, eostol=ps_eostol)
+		failtrig_oS = np.zeros(2)	# Account for multiple points of failure in function
+
+		# max(self.S_old(mass), 0.) is a hack to prevent interpolant from going below zero (which occasionally happens due to noisy S curves)
+		[dens, temp, gamma_dummy] = self.getdens_PS_est(press, max(self.S_old(mass), 0.), failtrig=failtrig, dens_est=dens_est, temp_est=temp_est, eostol=ps_eostol)
+		failtrig_oS[0] = failtrig[0]
 
 		Bfld = self.magf.fBfld(R, mass)
 		Pchi = (1./8./np.pi)*Bfld**2
 
 		# Take mag pressure Pchi = 0 for calculating hydro coefficients
 		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s] = self.geteosgradients(dens, temp, 0.0, failtrig=failtrig)
+		failtrig_oS[1] = failtrig[0]
 
 		dydx = np.zeros(2)
 		dydx[0] = 1./(4.*np.pi*R**2.*dens)
@@ -597,6 +602,8 @@ class mhs_steve(maghydrostar):
 
 		if self.nablarat_crit and (abs(nabla_terms["nd"])/hydrograd > self.nablarat_crit):
 			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
+
+		failtrig[0] = max(failtrig_oS)	# Return largest value for failtrig
 
 		if grad_full:
 			totalgrad = hydrograd + nabla_terms["nd"]
