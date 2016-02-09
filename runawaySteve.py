@@ -16,12 +16,12 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	if r_in.has_key("L_original"):
 		omegaest = 0.9*mystar.omega
 
-	# Empirically density estimates below 1e6 are less accurate, so we need more error tolerance
-	if densest < 1e6:
+	# Hack for more error tolerance at lower central densities; defaults to 1e6 and 1e7, but can be set below
+	if densest < r_in["lowerr_tol"]:
 		ps_eostol = 100.*r_in["ps_eostol"]
 		P_end_ratio = 100.*r_in["P_end_ratio"]
 		print "Running at reduced eostol = {0:.3e}; P_end_ratio = {1:.3e}".format(ps_eostol, P_end_ratio)
-	elif densest < 1e7:
+	elif densest < r_in["mederr_tol"]:
 		ps_eostol = 10.*r_in["ps_eostol"]
 		P_end_ratio = 10.*r_in["P_end_ratio"]
 		print "Running at reduced eostol = {0:.3e}; P_end_ratio = {1:.3e}".format(ps_eostol, P_end_ratio)
@@ -35,7 +35,7 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	damp_nrstep = 0.25
 
 #	if i == 20:
-#		charles_says = stop_this
+#	charles_says = stop_this
 	
 #	if r_in.has_key("L_original"):
 #		outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
@@ -65,7 +65,7 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	return outerr_code
 
 
-def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), mintemp=1e5, S_old=False, mass_tol=1e-6, P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, omega_crit_tol=1e-3, omega_warn=10., verbose=True):
+def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), mintemp=1e5, S_old=False, mass_tol=1e-6, P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, omega_crit_tol=1e-3, omega_warn=10., om_err_tol=[1e6, 1e7], verbose=True):
 	"""Obtains runaway of a star of some given mass, magnetic field, and rotation.  Outputs an object (usually several hundred megs large) that includes run inputs as "run_inputs", as well as all stellar output curves (hence its size) under "stars".
 
 	Arguments:
@@ -102,7 +102,9 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 			"mass_tol": mass_tol,
 			"L_tol": L_tol, 
 			"omega_crit_tol": omega_crit_tol, 
-			"omega_warn": omega_warn}
+			"omega_warn": omega_warn,
+			"lowerr_tol": om_err_tol[0],
+			"mederr_tol": om_err_tol[1]}
 
 	if (omega != 0) or r_in["magprofile"]:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"

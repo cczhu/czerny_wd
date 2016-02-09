@@ -230,7 +230,7 @@ class maghydrostar:
 		if self.derivtype == "simcd":
 			if magprofile:
 				self.nabladev = magprofile
-				if type(self.nabladev) != float:
+				if type(self.nabladev) != float and type(self.nabladev) != np.float64:
 					raise AssertionError("ERROR: if you use simcd derivtype, then magprofile must be (a float) equal to delta(r) = B^2/(B^2 + 4pi*Gamma1*Pgas)")
 			else:
 				self.nabladev = 0.
@@ -386,113 +386,116 @@ class maghydrostar:
 		[Mtot_drho, outerr_code] = self.integrate_star(densest + drho, temp_c, omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True)
 		return [(Mtot_drho - Mtot)/drho, outerr_code]
 
+############################# NESTED 1D JACOBIAN (SLOWER) #################################
 
-	def getrotatingstarmodel(self, densest=False, omegaest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, damp_nrstep=1, deltastepcoeff=0.05, 
-									interior_dscoeff=0.1, omega_warn=10., out_search=False):
-		"""
-		Newton-Raphson solver to obtain rigidly-rotating WD with user-specified mass and 
-		ANGULAR MOMENTUM.  If you wish to create a WD with user-specified mass and omega, 
-		use self.getstarmodel().  Arguments not defined below have identical meanings as 
-		class initialization ones.
+#	def getrotatingstarmodel(self, densest=False, omegaest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, damp_nrstep=1, deltastepcoeff=0.05, 
+#									interior_dscoeff=0.1, omega_warn=10., out_search=False):
+#		"""
+#		Newton-Raphson solver to obtain rigidly-rotating WD with user-specified mass and 
+#		ANGULAR MOMENTUM.  If you wish to create a WD with user-specified mass and omega, 
+#		use self.getstarmodel().  Arguments not defined below have identical meanings as 
+#		class initialization ones.
 
-		Parameters
-		----------
-		damp_nrstep : damping term for Newton-Raphson stepping.  Defaults to 1, 
-			but that will likely lead to overshooting near critical Omega values.
-		deltastepcoeff: when estimating the Jacobian, Delta Omega = 
-			deltastepcoeff*abs(deltaOmega_previous).  Defaults to 0.05.
-		interior_dscoeff: deltastepcoeff for getstarmodel mass-finding sub-loops.  
-			Defaults to 0.1.
-		omega_warn: stop integration if self.omega approaches omega_warn*omega_crit 
-			estimate.  Defaults to 10 to prevent premature stoppage.
-		out_search: prints L, omega calculated by integrate_star during the 
-			shooting process.
-		"""
+#		Parameters
+#		----------
+#		damp_nrstep : damping term for Newton-Raphson stepping.  Defaults to 1, 
+#			but that will likely lead to overshooting near critical Omega values.
+#		deltastepcoeff: when estimating the Jacobian, Delta Omega = 
+#			deltastepcoeff*abs(deltaOmega_previous).  Defaults to 0.05.
+#		interior_dscoeff: deltastepcoeff for getstarmodel mass-finding sub-loops.  
+#			Defaults to 0.1.
+#		omega_warn: stop integration if self.omega approaches omega_warn*omega_crit 
+#			estimate.  Defaults to 10 to prevent premature stoppage.
+#		out_search: prints L, omega calculated by integrate_star during the 
+#			shooting process.
+#		"""
 
-		if self.L_want <= 0.:
-			print "Please define self.L_want before using this function!  Quitting."
-			return
+#		if self.L_want <= 0.:
+#			print "Please define self.L_want before using this function!  Quitting."
+#			return
 
-		# If user doesn't specify, randomly pick a relatively safe omega
-		if omegaest:
-			self.omega = omegaest
-		else:
-			self.omega = 0.2
+#		# If user doesn't specify, randomly pick a relatively safe omega
+#		if omegaest:
+#			self.omega = omegaest
+#		else:
+#			self.omega = 0.2
 
-		if self.verbose:
-			print "==== GENERATING NEW ROTATING STAR MODEL ===="
+#		if self.verbose:
+#			print "==== GENERATING NEW ROTATING STAR MODEL ===="
 
-		i = 0
-		outerr_code = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=interior_dscoeff)	# First shot
-		Ltot = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*self.omega
+#		i = 0
+#		outerr_code = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=interior_dscoeff)	# First shot
+#		Ltot = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*self.omega
 
-		if self.verbose:
-			print "Omega overloop first shot: L = {0:.6e} (vs. L_want = {1:.6e}; relative err. {2:.6e}) ".format( \
-															Ltot, self.L_want, abs(Ltot - self.L_want)/self.L_want)
+#		if self.verbose:
+#			print "Omega overloop first shot: L = {0:.6e} (vs. L_want = {1:.6e}; relative err. {2:.6e}) ".format( \
+#															Ltot, self.L_want, abs(Ltot - self.L_want)/self.L_want)
 
-		delta_omega = self.omega		# Note to self - this shallow-copies self.omega, which is a float (and not some weird class instance thing)
+#		delta_omega = self.omega		# Note to self - this shallow-copies self.omega, which is a float (and not some weird class instance thing)
 
-		# Keep past shooting attempts
-		L_arr = np.array([Ltot])
-		omega_arr = np.array([self.omega])
+#		# Keep past shooting attempts
+#		L_arr = np.array([Ltot])
+#		omega_arr = np.array([self.omega])
 
-		while abs(Ltot - self.L_want) >= self.L_tol*self.L_want and i < self.nreps and not outerr_code:
+#		while abs(Ltot - self.L_want) >= self.L_tol*self.L_want and i < self.nreps and not outerr_code:
 
-			if self.verbose:
-				print "== RUNNING GETSTARMODEL WITHIN GETJACOBIAN_OMEGA =="
+#			if self.verbose:
+#				print "== RUNNING GETSTARMODEL WITHIN GETJACOBIAN_OMEGA =="
 
-			[dLdomega, outerr_code] = self.getjacobian_omega(self.data["rho"][0], Ltot, deltastepcoeff*delta_omega, S_want=S_want,
-													P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, interior_dscoeff=interior_dscoeff)		# Calculate Jacobian (self.omega auto-passed)
-			delta_omega = damp_nrstep*(self.L_want - Ltot)/dLdomega
-			self.omega += delta_omega
+#			[dLdomega, outerr_code] = self.getjacobian_omega(self.data["rho"][0], Ltot, deltastepcoeff*delta_omega, S_want=S_want,
+#													P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, interior_dscoeff=interior_dscoeff)		# Calculate Jacobian (self.omega auto-passed)
+#			delta_omega = damp_nrstep*(self.L_want - Ltot)/dLdomega
+#			self.omega += delta_omega
 
-			if self.omega < 0.:		#  Negative omega is not defined
-				self.omega = abs(delta_omega)*0.1
-			if self.verbose:
-				print "dLdomega is {0}, delta_omega is {1}".format(dLdomega, delta_omega)
-				print "Old omega = {0:.6e}; new omega = {1:.6e}".format(self.omega - delta_omega, self.omega)
-				print "== RUNNING GETSTARMODEL WITH REVISED OMEGA =="
+#			if self.omega < 0.:		#  Negative omega is not defined
+#				self.omega = abs(delta_omega)*0.1
+#			if self.verbose:
+#				print "dLdomega is {0}, delta_omega is {1}".format(dLdomega, delta_omega)
+#				print "Old omega = {0:.6e}; new omega = {1:.6e}".format(self.omega - delta_omega, self.omega)
+#				print "== RUNNING GETSTARMODEL WITH REVISED OMEGA =="
 
-			self.getstarmodel(densest=self.data["rho"][0], S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=interior_dscoeff)
-			Ltot = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*self.omega
-			if self.verbose:
-				print "Omega overloop shot: L = {0:.6e} (vs. L_want = {1:.6e}; relative err. {2:.6e}) ".format(Ltot, 
-																self.L_want, abs(Ltot - self.L_want)/self.L_want)
-			L_arr = np.append(L_arr, Ltot); omega_arr = np.append(omega_arr, self.omega)
+#			self.getstarmodel(densest=self.data["rho"][0], S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=interior_dscoeff)
+#			Ltot = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*self.omega
+#			if self.verbose:
+#				print "Omega overloop shot: L = {0:.6e} (vs. L_want = {1:.6e}; relative err. {2:.6e}) ".format(Ltot, 
+#																self.L_want, abs(Ltot - self.L_want)/self.L_want)
+#			L_arr = np.append(L_arr, Ltot); omega_arr = np.append(omega_arr, self.omega)
 
-			if self.omega > omega_warn*self.getcritrot(max(self.data["M"]), self.data["R"][-1]):
-				outerr_code = "Omega/Omega_crit > {0:.1e}".format(omega_warn)
+#			if self.omega > omega_warn*self.getcritrot(max(self.data["M"]), self.data["R"][-1]):
+#				outerr_code = "Omega/Omega_crit > {0:.1e}".format(omega_warn)
 
-			i += 1
+#			i += 1
 
-		if i == self.nreps:
-			print "WARNING, maximum number of shooting attempts {0:d} reached!".format(i)
+#		if i == self.nreps:
+#			print "WARNING, maximum number of shooting attempts {0:d} reached!".format(i)
 
-		# If we incur any error
-		if outerr_code:
-			print "OUTERR_CODE {0:s}!  EXITING FUNCTION!".format(outerr_code)
-			return outerr_code
+#		# If we incur any error
+#		if outerr_code:
+#			print "OUTERR_CODE {0:s}!  EXITING FUNCTION!".format(outerr_code)
+#			return outerr_code
 
-		if (abs(Ltot - self.L_want)/self.L_want > self.L_tol):
-			print "ERROR! (L_tot - L_want)/L_want = {0:.6e}   THIS IS BIGGER THAN YOUR TOLERANCE!  CHECK YOUR ICS!".format( \
-																(Ltot - self.L_want)/self.L_want)
-		else:
-			print "(L_tot - L_want)/L_want = {0:.6e}".format((Ltot - self.L_want)/self.L_want)
+#		if (abs(Ltot - self.L_want)/self.L_want > self.L_tol):
+#			print "ERROR! (L_tot - L_want)/L_want = {0:.6e}   THIS IS BIGGER THAN YOUR TOLERANCE!  CHECK YOUR ICS!".format( \
+#																(Ltot - self.L_want)/self.L_want)
+#		else:
+#			print "(L_tot - L_want)/L_want = {0:.6e}".format((Ltot - self.L_want)/self.L_want)
 
-		if out_search:
-			return [L_arr, omega_arr]
+#		if out_search:
+#			return [L_arr, omega_arr]
 
 
-	def getjacobian_omega(self, densest, Ltot, domega, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, interior_dscoeff=0.1):
-		"""Returns dL/domega for getrotatingstarmodel()
-		"""
-		omega_alt = self.omega + domega
-		outerr_code = self.getstarmodel(densest=densest, omega_user=omega_alt, S_want=S_want, 
-										P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=interior_dscoeff)
-		Ltot_domega = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*omega_alt
-		return [(Ltot_domega - Ltot)/domega, outerr_code]
+#	def getjacobian_omega(self, densest, Ltot, domega, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, interior_dscoeff=0.1):
+#		"""Returns dL/domega for getrotatingstarmodel()
+#		"""
+#		omega_alt = self.omega + domega
+#		outerr_code = self.getstarmodel(densest=densest, omega_user=omega_alt, S_want=S_want, 
+#										P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=interior_dscoeff)
+#		Ltot_domega = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*omega_alt
+#		return [(Ltot_domega - Ltot)/domega, outerr_code]
 
-############################# UNCOMMENT IF YOU WANT TO USE 2D JACOBIAN (I HAVEN'T FOUND IT TO BE FASTER #################################
+###################################################################################################
+
+############################# 2D JACOBIAN (FASTER, MORE DANGEROUS) #################################
 
 	def getrotatingstarmodel_2d(self, densest=False, omegaest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, damp_nrstep=1, deltastepcoeff=0.05, 
 									omega_warn=10., out_search=False):
@@ -637,8 +640,9 @@ class maghydrostar:
 		J_line2 = [(Ltot_drho - Ltot)/dvals[0], (Ltot_domega - Ltot)/dvals[1]]
 		return [np.array([J_line1, J_line2]), outerr_code]
 
-############################# UNCOMMENT IF YOU WANT TO USE 2D JACOBIAN (I HAVEN'T FOUND IT TO BE FASTER #################################
+###################################################################################################
 
+############################# OVERLOOP FOR OBTAINING CRITICAL OMEGA #################################
 
 	def getmaxomega(self, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, out_search=False):
 		"""
@@ -695,6 +699,204 @@ class maghydrostar:
 		if i == self.nreps:
 			print "WARNING, maximum number of shooting attempts {0:d} reached!".format(i)
 
+###################################################################################################
+
+############################# OVERLOOP FOR OBTAINING MAGNETIC FIELD CONFIGS #################################
+
+	def getBcnabladevmodel(self, Bc_want, nabladev_est=0.001, Bc_tol=1e-4, mass_user=False, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, deltastepcoeff=0.1, out_search=False):
+		"""
+		Wrapper to obtain WD with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas) 
+		with user-specified central magnetic field strength Bc.  Calls 
+		getstarmodel as a subloop to obtain stars with a specific mass.  
+		Arguments not listed below have identical meanings as class 
+		initialization ones.
+
+		Parameters
+		----------
+		Bc_want : user-specified central magnetic field strength
+		nabladev_est : initial estimate for nabladev
+		Bc_tol : tolerance between calculated and user specified central field
+		mass_user : use mass_user instead of self.mass_want in getstarmodel.
+		deltastepcoeff : when estimating the Jacobian, Delta rho = 
+			deltastepcoeff*abs(deltadens_previous).  Defaults to 0.1.
+		out_search : prints the rho and corresponding M values calculated by 
+			integrate_star during the shooting process
+		"""
+
+		if self.derivtype != "simcd":
+			print "get_B_energy_ratio REQUIRES self.simcd to be true!  Quitting!"
+			return
+
+		if mass_user:
+			self.mass_want = mass_user
+
+		if nabladev_est:
+			self.nabladev = nabladev_est
+		deltadev = self.nabladev
+
+		if self.verbose:
+			print "== RUNNING getBcnabladevmodel, INITIAL nabladev = {0:.6e}".format(self.nabladev)
+
+		i = 0
+		outerr_code = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=deltastepcoeff)
+		Bc = self.data["B"][0]
+		densest = self.data["rho"][0]
+
+		# Keep past shooting attempts
+		B_arr = np.array([Bc])
+		dev_arr = np.array([self.nabladev])
+
+		while abs(Bc - Bc_want) >= Bc_tol*Bc_want and i < self.nreps and not outerr_code:
+
+			[dBddev, outerr_code] = self.getjacobian_Bdev(densest, Bc, deltastepcoeff*abs(deltadev), 
+													S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=deltastepcoeff)	# Calculate Jacobian
+			deltadev = (Bc_want - Bc)/dBddev
+			self.nabladev += deltadev
+
+			if self.nabladev <= 0.:	# nabladev can't be negative
+				self.nabladev = abs(deltadev)*0.1
+			if self.verbose:
+				print "== dBddev is {0:.6e}, deltadev is {1:.6e}".format(dBddev, deltadev)
+				print "== Old dev = {0:.6e}; new dev = {1:.6e}".format(self.nabladev - deltadev, self.nabladev)
+
+			outerr_code = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=deltastepcoeff)
+			Bc = self.data["B"][0]
+			if self.verbose:
+				print "== Current shot: Bc = {0:.6e} (vs. Bc_want = {1:.6e}; relative err. {2:.6e})".format(Bc, Bc_want, abs(Bc - Bc_want)/Bc_want)
+			B_arr = np.append(B_arr, Bc)
+			dev_arr = np.append(dev_arr, self.nabladev)
+
+			i += 1
+
+		if i == self.nreps:
+			print "== ERROR, maximum number of shooting attempts {0:d} reached!".format(i)
+			return "nrepsnotconverged_err"
+
+		# If we incur any error
+		if outerr_code:
+			print "== OUTERR_CODE {0:s}!  EXITING FUNCTION!".format(outerr_code)
+			return outerr_code
+
+		if abs((Bc - Bc_want)/Bc_want) > Bc_tol:
+			print "== ERROR! (Bc - Bc_want)/Bc_want = {0:.6e}  THIS IS BIGGER THAN YOUR TOLERANCE!  CHECK YOUR ICS!".format((Bc - Bc_want)/Bc_want)
+		else:
+			print "== (Bc - Bc_want)/Bc_want = {0:.6e}".format((Bc - Bc_want)/Bc_want)
+
+		if out_search:
+			return [B_arr, dev_arr]
+
+
+	def getjacobian_Bdev(self, densest, Bc, ddev, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, deltastepcoeff=0.1):
+		"""Returns dB/dnabladev.
+		"""
+		self.nabladev += ddev
+		outerr_code = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=deltastepcoeff)
+		Bcn = self.data["B"][0]
+		self.nabladev -= ddev
+		return [(Bcn - Bc)/ddev, outerr_code]
+
+
+	def getEBnabladevmodel(self, EBrat_want, nabladev_est=0.001, EBr_tol=1e-4, mass_user=False, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, deltastepcoeff=0.1, out_search=False):
+		"""
+		Wrapper to obtain WD with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas) 
+		with user-specified ratio between total magnetic and total energy 
+		E_B/E_tot.  Calls getstarmodel as a subloop to obtain stars with a 
+		specific mass.  Arguments not listed below have identical meanings as 
+		class initialization ones.
+
+		Parameters
+		----------
+		EBrat_want : user-specified central magnetic field strength
+		nabladev_est : initial estimate for nabladev
+		EBr_tol : tolerance between calculated and user specified central field
+		mass_user : use mass_user instead of self.mass_want in getstarmodel.
+		deltastepcoeff : when estimating the Jacobian, Delta rho = 
+			deltastepcoeff*abs(deltadens_previous).  Defaults to 0.1.
+		out_search : prints the rho and corresponding M values calculated by 
+			integrate_star during the shooting process
+		"""
+
+		if self.derivtype != "simcd":
+			print "get_B_energy_ratio REQUIRES self.simcd to be true!  Quitting!"
+			return
+
+		if mass_user:
+			self.mass_want = mass_user
+
+		if nabladev_est:
+			self.nabladev = nabladev_est
+		deltadev = self.nabladev
+
+		if self.verbose:
+			print "== RUNNING getEBnabladevmodel, INITIAL nabladev = {0:.6e}".format(self.nabladev)
+
+		i = 0
+		outerr_code = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=deltastepcoeff)
+		self.getenergies()
+		Etot = self.data["Eth"] + self.data["Erot"] + self.data["Edeg"] + self.data["EB"] + self.data["Epot"]
+		EBrat = self.data["EB"][-1]/abs(Etot[-1])
+		densest = self.data["rho"][0]
+
+		# Keep past shooting attempts
+		EBr_arr = np.array([EBrat])
+		dev_arr = np.array([self.nabladev])
+
+		while abs(EBrat - EBrat_want) >= EBr_tol*EBrat_want and i < self.nreps and not outerr_code:
+
+			[dEBrddev, outerr_code] = self.getjacobian_EBrdev(densest, EBrat, deltastepcoeff*abs(deltadev), 
+													S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=deltastepcoeff)	# Calculate Jacobian
+			deltadev = (EBrat_want - EBrat)/dEBrddev
+			self.nabladev += deltadev
+
+			if self.nabladev <= 0.:	# nabladev can't be negative
+				self.nabladev = abs(deltadev)*0.1
+			if self.verbose:
+				print "== dBddev is {0:.6e}, deltadev is {1:.6e}".format(dEBrddev, deltadev)
+				print "== Old dev = {0:.6e}; new dev = {1:.6e}".format(self.nabladev - deltadev, self.nabladev)
+
+			outerr_code = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=deltastepcoeff)
+			self.getenergies()
+			Etot = self.data["Eth"] + self.data["Erot"] + self.data["Edeg"] + self.data["EB"] + self.data["Epot"]
+			EBrat = self.data["EB"][-1]/abs(Etot[-1])
+			if self.verbose:
+				print "== Current shot: EBrat = {0:.6e} (vs. EBrat_want = {1:.6e}; relative err. {2:.6e})".format(EBrat, EBrat_want, abs(EBrat - EBrat_want)/EBrat_want)
+			EBr_arr = np.append(EBr_arr, EBrat)
+			dev_arr = np.append(dev_arr, self.nabladev)
+
+			i += 1
+
+		if i == self.nreps:
+			print "== ERROR, maximum number of shooting attempts {0:d} reached!".format(i)
+			return "nrepsnotconverged_err"
+
+		# If we incur any error
+		if outerr_code:
+			print "== OUTERR_CODE {0:s}!  EXITING FUNCTION!".format(outerr_code)
+			return outerr_code
+
+		if abs(EBrat - EBrat_want)/EBrat_want > EBr_tol:
+			print "== ERROR! (EB - EB_want)/EB_want = {0:.6e}  THIS IS BIGGER THAN YOUR TOLERANCE!  CHECK YOUR ICS!".format(abs(EBrat - EBrat_want)/EBrat_want)
+		else:
+			print "== (EB - EB_want)/EB_want = {0:.6e}".format(abs(EBrat - EBrat_want)/EBrat_want)
+
+		if out_search:
+			return [EBr_arr, dev_arr]
+
+
+	def getjacobian_EBrdev(self, densest, EBrat, ddev, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, deltastepcoeff=0.1):
+		"""Returns dEBrat/dnabladev.
+		"""
+		self.nabladev += ddev
+		outerr_code = self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, deltastepcoeff=deltastepcoeff)
+		self.getenergies()
+		Etotn = self.data["Eth"] + self.data["Erot"] + self.data["Edeg"] + self.data["EB"] + self.data["Epot"]
+		EBratn = self.data["EB"][-1]/abs(Etotn[-1])
+		self.nabladev -= ddev
+		return [(EBratn - EBrat)/ddev, outerr_code]
+
+###################################################################################################
+
+############################# MISC #################################
 
 	@staticmethod
 	def chk_global_extrema(M_arr, dens_arr, Mwant):

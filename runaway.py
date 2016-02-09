@@ -16,11 +16,11 @@ def obtain_model(mystar, i, r_in, verbose=False):
 		omegaest = 0.9*mystar.omega
 
 	# Empirically density estimates below 1e6 are less accurate, so we need more error tolerance
-	if densest < 1e6:
+	if densest < r_in["lowerr_tol"]:
 		ps_eostol = 100.*r_in["ps_eostol"]
 		P_end_ratio = 100.*r_in["P_end_ratio"]
 		print "Running at reduced eostol = {0:.3e}; P_end_ratio = {1:.3e}".format(ps_eostol, P_end_ratio)
-	elif densest < 1e7:
+	elif densest < r_in["mederr_tol"]:
 		ps_eostol = 10.*r_in["ps_eostol"]
 		P_end_ratio = 10.*r_in["P_end_ratio"]
 		print "Running at reduced eostol = {0:.3e}; P_end_ratio = {1:.3e}".format(ps_eostol, P_end_ratio)
@@ -32,7 +32,7 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	deltastepcoeff_rho = 0.1
 	deltastepcoeff_omega = 0.1
 	damp_nrstep = 0.25
-	
+
 #	if r_in.has_key("L_original"):
 #		outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
 #													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
@@ -50,7 +50,7 @@ def obtain_model(mystar, i, r_in, verbose=False):
 			outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
 													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
 	else:	# For now, keep P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"]
-		outerr_code = mystar.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
+		outerr_code = mystar.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
 										deltastepcoeff=deltastepcoeff_rho)
 
 		if outerr_code:
@@ -61,7 +61,7 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	return outerr_code
 
 
-def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), mintemp=1e4, stop_mindenserr=1e-10, derivtype="sim", mass_tol=1e-3, P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, simd_userot=True, simd_usegammavar=True, simd_usegrav=True, simd_suppress=False, omega_crit_tol=1e-2, omega_warn=10., verbose=True):
+def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), mintemp=1e5, stop_mindenserr=1e-10, derivtype="sim", mass_tol=1e-3, P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, simd_userot=True, simd_usegammavar=True, simd_usegrav=True, simd_suppress=False, omega_crit_tol=1e-2, omega_warn=10., om_err_tol=[1e6, 1e7], verbose=True):
 	"""Obtains runaway of a star of some given mass, magnetic field, and rotation.  Outputs an object (usually several hundred megs large) that includes run inputs as "run_inputs", as well as all stellar output curves (hence its size) under "stars".
 
 	Arguments:
@@ -115,7 +115,9 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 			"mass_tol": mass_tol,
 			"L_tol": L_tol, 
 			"omega_crit_tol": omega_crit_tol, 
-			"omega_warn": omega_warn}
+			"omega_warn": omega_warn,
+			"lowerr_tol": om_err_tol[0],
+			"mederr_tol": om_err_tol[1]}
 
 	if (omega != 0) or mymag:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
