@@ -173,7 +173,7 @@ class maghydrostar:
 		if not magprofile:
 			if self.verbose:
 				print "magprofile == False - will assume star has no magnetic field!"
-			self.magf = magprof.magprofile(None, None, None, blankfunc=True)
+			self.magf = magprof.magprofile(None, None, None, None, blankfunc=True)
 		else:
 			self.magf = magprofile
 
@@ -724,7 +724,7 @@ class maghydrostar:
 		"""
 
 		if self.derivtype != "simcd":
-			print "get_B_energy_ratio REQUIRES self.simcd to be true!  Quitting!"
+			print "getBcnabladevmodel REQUIRES self.simcd to be true!  Quitting!"
 			return
 
 		if mass_user:
@@ -817,7 +817,7 @@ class maghydrostar:
 		"""
 
 		if self.derivtype != "simcd":
-			print "get_B_energy_ratio REQUIRES self.simcd to be true!  Quitting!"
+			print "getEBnabladevmodel REQUIRES self.simcd to be true!  Quitting!"
 			return
 
 		if mass_user:
