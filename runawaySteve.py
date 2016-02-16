@@ -108,7 +108,7 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 
 	if (omega != 0) or r_in["magprofile"]:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
-		mymagzero = magprof.magprofile(None, None, None, blankfunc=True)
+		mymagzero = magprof.magprofile(None, None, None, None, blankfunc=True)
 		hstar = Star.mhs_steve(r_in["mass"], False, magprofile=mymagzero, omega=0., temp_c=5e6, mintemp=r_in["mintemp"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 		densest=0.9*hstar.data["rho"][0]
 

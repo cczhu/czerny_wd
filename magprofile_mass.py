@@ -14,8 +14,9 @@ class magprofile:
 	Parameters
 	----------
 	radius : radius
-	mass : mass
+	mass : mass(r) profile
 	Bfld : B(r) profile
+	rho : rho(r) profile
 	filename : read profile from file (class constructor will not read radius 
 		or Bfld in that case)
 	smooth : smooth profile before using it for interpolation
@@ -116,7 +117,7 @@ class magprofile:
 		else:
 			radius_ext = self.radius
 			Bfld_ext = self.Bfld
-		fBfld = UnivariateSpline(radius_ext, Bfld_ext, k=self.spline_k)
+		fBfld = UnivariateSpline(radius_ext, Bfld_ext, k=self.spline_k, ext=3)
 
 		return fBfld
 
@@ -131,7 +132,7 @@ class magprofile:
 		else:
 			radius_ext = self.radius
 			mass_ext = self.mass
-		frad = UnivariateSpline(mass_ext, radius_ext, k=self.spline_k, s=self.spline_s*len(radius_ext))
+		frad = UnivariateSpline(mass_ext, radius_ext, k=self.spline_k, s=self.spline_s*len(radius_ext), ext=3)
 		if np.isnan(frad(1e33)):
 			raise AssertionError("Univariate spline instance unable to take a massive radius!")
 		return frad
