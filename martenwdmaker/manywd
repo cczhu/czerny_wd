@@ -1,0 +1,2 @@
+awk 'BEGIN {for(dc=1e4;dc<=1e10;dc=dc*1.2){print "echo -n " dc "; ./helmholtzwd " dc " |tail -1"}}' >_._
+. _._ >manywd.dat
