@@ -11,16 +11,17 @@ import numpy as np
 import scipy.interpolate as sci_interp
 import StarMod as Star
 import runaway as rw
+import os, sys
 
 ##################### SUPPORT FUNCTIONS ####################
 
 def tc_get_marten_WD(dens_c, temp_c):
 	""" Obtain WD profile from Marten's HelmholtzWD code.
 	"""
-	os.system("./martenwdmaker/helmholtzwd {0:.6e} {1:.6e} > martentemp.txt".format(dens_c, temp_c))
+	os.system("./martenwdmaker/martenwd {0:.6e} {1:.6e} {2:.6e} {3:.6e} > martentemp.txt".format(dens_c, temp_c, 0., 1e5))
 
 	f = open("martentemp.txt", 'r')
-	data2 = np.loadtxt(f)
+	data2 = np.loadtxt(f, usecols=(0,1,2))
 
 	out = {}
 	out["R"] = data2[:,0]
@@ -33,22 +34,16 @@ def tc_get_marten_WD(dens_c, temp_c):
 	return out
 
 
-def tc_uneven_arrays_ratio(X1, Y1, X2, Y2):
+def tc_recast_array(X, Y, Xr):
 	"""Checks the ratio of two profiles ([X1, Y1] and [X2, Y2]) that have different lengths.
 
 	Arguments:
-	X1/Y1: x and y values of profile 1
-	X2/Y2: x and y values of profile 2
+	X/Y: x and y values
+	Xr: rebinned x values
 	"""
-	if max(X1) > max(X2):
-		X_spline = X1; Y_spline = Y1
-		X_use = X2; Y_use = Y2
-	else:
-		X_spline = X2; Y_spline = Y2
-		X_use = X1; Y_use = Y1
-	Ysout = sci_interp.UnivariateSpline(X_spline, Y_spline)
-	Y_num = Ysout(X_use)
-	return [X_use, Y_num/Y_use]
+	Ysout = sci_interp.UnivariateSpline(X, Y)
+	Yr = Ysout(Xr)
+	return Yr
 
 
 def tc_checkmodeltol(od):
@@ -91,15 +86,31 @@ def tc_checkmodeltol(od):
 
 ##################### TEST SUITE ###########################
 
-def tc_check_vs_marten(od, tol=1e-3):
+def tc_check_vs_marten_loop_element(ods, tol=1e-2, cutoff_mass=0.9):
 	"""Checks data instance against Marten's code.
 	"""
 
+	marten = tc_get_marten_WD(ods["rho"][0], ods["T"][0])
+	if len(marten["R"]) < len(ods["R"]):
+		rho_default = marten["dens"]
+		rho_recast = tc_recast_array(ods["R"], ods["rho"], marten["R"])
+	else:
+		rho_default = ods["rho"]
+		rho_recast = tc_recast_array(marten["R"], marten["dens"] , ods["R"])
+	rho_dev = abs(rho_recast - rho_default)/rho_recast
+	cutoff = min(ods["rho"][ods["M"] < cutoff_mass*max(ods["M"])])
+	args_want = rho_default > cutoff
+	if max(rho_dev[args_want]) > tol:
+		raise AssertionError("ERROR: maximum drho/rho = {0:.3e} > {1:.3e}".format(max(rho_dev[args_want]), tol))
+	print "maximum drho/rho = {0:.3e} < {1:.3e}".format(max(rho_dev[args_want]), tol)
+
+
+def tc_check_vs_marten(od, tol=1e-3):
+	"""Loop for tc_check_vs_marten to act on output data structure
+	"""
+
 	for i in range(len(od["stars"])):
-		marten = tc_get_marten_WD(od["stars"]["rho"][0], od["stars"]["T"][0])
-		rho_dev = abs(od["stars"]["rho"] - marten["dens"])/od["stars"]["rho"]
-		if max(rho_dev) > tol:
-			raise AssertionError("ERROR: maximum (rho - rho_marten)/rho = {0:.3e} > {1:.3e}".format(max(rho_dev), tol))
+		tc_check_vs_marten_loop_element(od["stars"][i], tol=tol)
 
 
 def tc_run_suite():
@@ -111,6 +122,6 @@ def tc_run_suite():
 	# Coulomb = off
 
 	static_S = [1e7,2e7,3e7,4e7,5e7] + list(10.**arange(np.log10(6e7), np.log10(2.2e8*1.01), 0.005))
-	od = rw.make_runaway(starmass=1.15*1.9891e33, mymag=False, omega=0., S_arr=static_S, mintemp=1e5, stop_mindenserr=1e-10, derivtype="sim", mass_tol=1e-6, P_end_ratio=1e-8, simd_userot=False, simd_usegammavar=False, simd_usegrav=False, simd_suppress=False, verbose=True)
+	od = rw.make_runaway(starmass=1.15*1.9891e33, mymag=False, omega=0., S_arr=static_S, mintemp=1e5, tog_coul=False, stop_mindenserr=1e-10, mass_tol=1e-6, P_end_ratio=1e-8, simd_userot=False, simd_usegammavar=False, simd_usegrav=False, simd_suppress=False, verbose=True)
 
 	tc_check_vs_marten(od)

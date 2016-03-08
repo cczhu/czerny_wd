@@ -5,13 +5,13 @@ import scipy.integrate as scipyinteg
 import os, sys
 import myhelm_magstar as myhmag
 import rhoTcontours as rtc
-from StarModCore import maghydrostar_core
+from StarMod import maghydrostar
 import magprofile_mass as magprof
 import Sprofile_mass as sprof
 
 ################EndSimmer CLASS###############################
 
-class mhs_steve(maghydrostar_core):
+class mhs_steve(maghydrostar):
 	"""
 	Magnetohydrostatic star generator.  Generates spherical WDs with 
 	adiabatic temperature profiles using the Helmholtz 
@@ -24,9 +24,9 @@ class mhs_steve(maghydrostar_core):
 	mass : wanted mass (g)
 	S_want : user-specified central entropy (erg/K)
 	magprofile : magnetic profile object.  Defaults to false, meaning no 
-		magnetic field.  To insert a user-defined field, insert a magf object.
-		To generate a field with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas),
-		insert a float equal to delta.
+		magnetic field.  If derivtype="sim", a magf object containing the 
+		field should be passed.  If derivtype="simcd", magprofile should 
+		equal delta = B^2/(B^2 + 4pi*Gamma1*Pgas).
 	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
 		rotating).  If < 0, attempts to estimate break-up omega with 
 		self.getomegamax(), if >= 0, uses user defined value.
@@ -73,7 +73,7 @@ class mhs_steve(maghydrostar_core):
 
 	Examples
 	--------
-	See examples in StarMod.py - command syntax is identical.
+	See examples in StarMod.py - command syntax is identica.
 	"""
 
 	def __init__(self, mass, S_want, magprofile=False, omega=0., Lwant=0., 
@@ -95,9 +95,9 @@ class mhs_steve(maghydrostar_core):
 
 		# maghydrostar class initialization: DONTINTEGRATE MUST BE SET
 		# TO TRUE FOR CURRENT CODE TO WORK!
-		maghydrostar_core.__init__(self, mass, temp_c, magprofile=magprofile, 
+		maghydrostar.__init__(self, mass, temp_c, magprofile=magprofile, 
 				omega=omega, Lwant=Lwant, S_want=S_want, mintemp=mintemp, 
-				stop_mindenserr=stop_mindenserr, 
+				derivtype="sim", stop_mindenserr=stop_mindenserr, 
 				simd_userot=False, simd_usegammavar=False, 
 				simd_usegrav=False, densest=densest, omegaest=omegaest, 
 				mass_tol=mass_tol, L_tol=L_tol, omega_crit_tol=omega_crit_tol,
@@ -107,11 +107,6 @@ class mhs_steve(maghydrostar_core):
 		self.first_deriv = self.first_derivatives_steve
 		if self.verbose:		# self.verbose is implicitly defined in maghydrostar
 			print "Replacing derivatives_gtsh with derivatives_steve!"
-
-		# Stop doing whatever if user inserts rotation and B field
-		if magprofile and omega != 0.:
-			print "You cannot currently insert a magnetic field simultaneously with non-zero rotation!  Quitting."
-			return
 
 		if dontintegrate:
 			if self.verbose:
@@ -148,10 +143,6 @@ class mhs_steve(maghydrostar_core):
 		omega : solid-body angular speed (rad/s)
 		outputerr : output any error codes received from integrator
 		"""
-
-		# If we use self.nabladev make sure it isn't negative
-		if self.nabladev:
-			assert self.nabladev > 0.
 
 		stepsize = max(self.mass_want,0.4*self.Msun)*0.01*min(self.mass_tol, 1e-6)	# Found out the hard way that if you use simd_usegammavar, having a large mass_tol can cause errors
 
@@ -692,48 +683,3 @@ class mhs_steve(maghydrostar_core):
 		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
 		self.data["vnuc"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
-
-
-########################################### BLANK STARMOD FOR POST-PROCESSING #############################################
-
-	def backcalculate_subloop(self):
-		"""mhs_steve subloop to backcalculate.
-		"""
-
-		datalength = len(self.data["M"])
-		m_step = self.data["M"][1:] - self.data["M"][:-1]
-		m_step = np.concatenate( [m_step, np.array([m_step[-1]])] )
-
-		# Create temporary housing for data
-		temp_data = {"Pgas": np.zeros(datalength),
-					"Sgas": np.zeros(datalength),
-					"Pmag": np.zeros(datalength),
-					"nabla_hydro": np.zeros(datalength),
-					"nabla_mhdr": np.zeros(datalength),
-					}
-
-		if self.simd_usegammavar:
-			self.data["dlngamdlnP"] = np.zeros(datalength)
-			self.data["nd_gamma"] = np.zeros(datalength)
-		if self.simd_usegrav:
-			self.data["dlngdlnP"] = np.zeros(datalength)
-			self.data["nd_grav"] = np.zeros(datalength)
-		if self.simd_userot:
-			self.data["nd_rot"] = np.zeros(datalength)
-
-		for i in range(datalength):
-			[temp_data["Pgas"][i], temp_data["Sgas"][i]] = self.getpress_rhoT(self.data["rho"][i], self.data["T"][i])
-			[dydx, Bfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms]
-			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
-			[dummydy, dummyBfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
-
-			if self.simd_usegammavar:
-				self.data["dlngamdlnP"][i] = nabla_terms["dlngamdlnP"]
-				self.data["nd_gamma"][i] = nabla_terms["nd_gamma"]
-			if self.simd_usegrav:
-				self.data["dlngdlnP"][i] = nabla_terms["dlngdlnP"]
-				self.data["nd_grav"][i] = nabla_terms["nd_grav"]
-			if self.simd_userot:
-				self.data["nd_rot"][i] = nabla_terms["nd_rot"]
-
-		return temp_data

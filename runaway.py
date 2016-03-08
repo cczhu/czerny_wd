@@ -61,7 +61,10 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	return outerr_code
 
 
-def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), mintemp=1e5, stop_mindenserr=1e-10, derivtype="sim", mass_tol=1e-3, P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, simd_userot=True, simd_usegammavar=True, simd_usegrav=True, simd_suppress=False, omega_crit_tol=1e-2, omega_warn=10., om_err_tol=[1e6, 1e7], verbose=True):
+def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), 
+					mintemp=1e5, tog_coul=True, mass_tol=1e-3, P_end_ratio=1e-8, densest=False, stop_mindenserr=1e-10, 
+					L_tol=1e-2, keepstars=False, simd_userot=True, simd_usegammavar=True, simd_usegrav=True, simd_suppress=False, 
+					omega_crit_tol=1e-2, omega_warn=10., om_err_tol=[1e6, 1e7], verbose=True):
 	"""Obtains runaway of a star of some given mass, magnetic field, and rotation.  Outputs an object (usually several hundred megs large) that includes run inputs as "run_inputs", as well as all stellar output curves (hence its size) under "stars".
 
 	Arguments:
@@ -70,7 +73,6 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 	omega: rigid rotation angular velocity.  Defaults to 0 (non-rotating).  If < 0, attempts to estimate break-up omega with self.getomegamax(), if >= 0, uses user defined value.
 	S_arr: list of central entropy values in the runaway track
 	mintemp: temperature floor, effectively switches from adiabatic to isothermal profile if reached
-	derivtype: derivative function used
 	mass_tol: fractional tolerance between mass wanted and mass produced by self.getstarmodel()
 	P_end_ratio: ratio of P/P_c at which to terminate stellar integration
 	densest: central density initial estimate for self.getstarmodel()
@@ -98,8 +100,8 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 			"omega_run_rat": omega_run_rat, 
 			"S_arr": S_arr, 
 			"mintemp": mintemp,  
-			"derivtype": derivtype, 
 			"composition": "CO",
+			"tog_coul": tog_coul,
 			"simd_userot": simd_userot, 
 			"simd_usegammavar": simd_usegammavar, 
 			"simd_usegrav": simd_usegrav, 
@@ -122,12 +124,12 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 	if (omega != 0) or mymag:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
 		mymagzero = magprof.magprofile(None, None, None, None, blankfunc=True)
-		hstar = Star.maghydrostar(r_in["mass"], max(5e6,mintemp), magprofile=mymagzero, omega=0., S_want=False, mintemp=r_in["mintemp"], derivtype=r_in["derivtype"], composition=r_in["composition"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mindenserr=r_in["stop_mindenserr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+		hstar = Star.maghydrostar(r_in["mass"], max(5e6,mintemp), magprofile=mymagzero, omega=0., S_want=False, mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mindenserr=r_in["stop_mindenserr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 		densest=0.9*hstar.data["rho"][0]
 
 	print "*************Okay, let's make a low-temperature (possibly MHD/rotating) star************"
 	mystar = Star.maghydrostar(r_in["mass"], max(5e6,mintemp), magprofile=mymag, omega=r_in["omega"], S_want=False, 	#Rest after this is identical to function call above
-				mintemp=r_in["mintemp"], derivtype=r_in["derivtype"], composition=r_in["composition"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mindenserr=r_in["stop_mindenserr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+				mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mindenserr=r_in["stop_mindenserr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 
 	# If we use a high-temperature mintemp, remove any S_arr
 	if S_arr[0] < mystar.data["Sgas"][0]:

@@ -2129,8 +2129,8 @@
         z   = srad + sion + sele + scoul
 
 !        write(6,*) x,y,z
-!        if (x .le. 0.0 .or. y .le. 0.0 .or. z .le. 0.0) then
-        if (x .le. 0.0 .or. y .le. 0.0) then
+        if (x .le. 0.0 .or. y .le. 0.0 .or. z .le. 0.0) then
+!        if (x .le. 0.0 .or. y .le. 0.0) then
 !        if (x .le. 0.0) then
 
 !         write(6,*)

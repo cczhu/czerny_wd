@@ -994,7 +994,7 @@
         z   = srad + sion + sele + scoul
 
 !        write(6,*) x,y,z
-        if (x .le. 0.0 .or. y .le. 0.0 .or. z .le. 0.0) then
+!        if (x .le. 0.0 .or. y .le. 0.0 .or. z .le. 0.0) then
 !        if (x .le. 0.0 .or. y .le. 0.0) then
 !        if (x .le. 0.0) then
 
@@ -1003,22 +1003,22 @@
 !         write(6,*) 'setting all coulomb corrections to zero'
 !         write(6,*)
 
-         pcoul    = 0.0d0
-         dpcouldd = 0.0d0
-         dpcouldt = 0.0d0
-         dpcoulda = 0.0d0
-         dpcouldz = 0.0d0
-         ecoul    = 0.0d0
-         decouldd = 0.0d0
-         decouldt = 0.0d0
-         decoulda = 0.0d0
-         decouldz = 0.0d0
-         scoul    = 0.0d0
-         dscouldd = 0.0d0
-         dscouldt = 0.0d0
-         dscoulda = 0.0d0
-         dscouldz = 0.0d0
-        end if
+        pcoul    = 0.0d0
+        dpcouldd = 0.0d0
+        dpcouldt = 0.0d0
+        dpcoulda = 0.0d0
+        dpcouldz = 0.0d0
+        ecoul    = 0.0d0
+        decouldd = 0.0d0
+        decouldt = 0.0d0
+        decoulda = 0.0d0
+        decouldz = 0.0d0
+        scoul    = 0.0d0
+        dscouldd = 0.0d0
+        dscouldt = 0.0d0
+        dscoulda = 0.0d0
+        dscouldz = 0.0d0
+!        end if
 
 
 ! sum all the gas components

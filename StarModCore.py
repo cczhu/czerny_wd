@@ -7,11 +7,10 @@ import copy as cp
 import magprofile_mass as magprof
 import myhelm_magstar as myhmag
 import rhoTcontours as rtc
-#from StarModCore import maghydrostar
 
 ################HYDROSTAR CLASS###############################
 
-class maghydrostar():	#maghydrostar_core):
+class maghydrostar_core():	#maghydrostar_core):
 	"""
 	Magnetohydrostatic star generator.  Generates spherical WDs with 
 	adiabatic temperature profiles using the Helmholtz 
@@ -134,7 +133,7 @@ class maghydrostar():	#maghydrostar_core):
 	"""
 
 	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
-				S_want=False, mintemp=1e5, composition="CO", togglecoulomb=True,
+				S_want=False, mintemp=1e5, composition="CO", derivtype="sim",
 				simd_userot=True, simd_usegammavar=False, simd_usegrav=False, 
 				simd_suppress=False, nablarat_crit=False, P_end_ratio=1e-8, 
 				ps_eostol=1e-8, fakeouterpoint=False, stop_invertererr=True, 
@@ -150,6 +149,7 @@ class maghydrostar():	#maghydrostar_core):
 		self.mass_tol = mass_tol
 		self.temp_c = temp_c
 		self.nreps = nreps
+		self.derivtype = derivtype
 		self.nablarat_crit = nablarat_crit
 
 		# recent additions to __init__ (formerly were just passed to getstarmodel).
@@ -163,8 +163,6 @@ class maghydrostar():	#maghydrostar_core):
 		self.omega_crit_tol = omega_crit_tol
 		self.L_want = Lwant
 		self.L_tol = L_tol
-
-		self.togglecoulomb = togglecoulomb
 
 		# Remember to print messages
 		self.verbose = verbose
@@ -227,18 +225,24 @@ class maghydrostar():	#maghydrostar_core):
 			print "I noticed you haven't initialized helmholtz.  Doing so now."
 			myhmag.initializehelmholtz()	# ...initialize helmholtz
 
-		# Check if magnetic field should be back-calculated or obtained from spline
-		if type(magprofile) == float or type(magprofile) == np.float64:
-			self.nabladev = magprofile
-			if self.nabladev <= 0.:
-				raise AssertionError("ERROR: if you use a constant delta field, then magprofile must be a positive value!")
+		if self.derivtype == "simcd":
+			if magprofile:
+				self.nabladev = magprofile
+				if type(self.nabladev) != float and type(self.nabladev) != np.float64:
+					raise AssertionError("ERROR: if you use simcd derivtype, then magprofile must be (a float) equal to delta(r) = B^2/(B^2 + 4pi*Gamma1*Pgas)")
+			else:
+				self.nabladev = 0.
 			if self.verbose:
-				print "Derivative WITH CONSTANT DEVIATION RATIO {0:.3e} selected! Using self.nabladev as deviation delta(r) (MM09 Eqn. 4).".format(self.nabladev)
+				print "Derivative WITH CONSTANT DEVIATION RATIO selected! Using self.nabladev as deviation delta(r) (MM09 Eqn. 4)."
 		else:
-			self.nabladev = False
+			if self.verbose:
+				print "GT66/MM09 derivative selected!"
 		# derivatives_gtsh now handles both constant deviation and user-defined magnetic profile.
 		self.derivatives = self.derivatives_gtsh
 		self.first_deriv = self.first_derivatives_gtsh
+
+		# Set temperature floor - essentially necessary since Helmholtz has a 1000 K temperature floor.
+#		self.mintemp_func = self.mintemp_func_creator()		#lambda x: 1./(np.exp(-100.*(x - 1.125*self.mintemp)/self.mintemp) + 1.)	#**2
 
 		self.data = {}
 		if dontintegrate:
@@ -1498,15 +1502,35 @@ class maghydrostar():	#maghydrostar_core):
 	def blankstar(cls, input_data, i_args=False, backcalculate=False, **kwargs):
 		"""Generates a dummy star, and loads in user-inputted stellar data.  Data structure MUST include "R", "M", "rho", "T" and "B" for self.backcalculate to work.  Arguments are otherwise identical to those of maghydrostar.__init__; for kwargs, see class constructor arguments.
 
-		Arguments:
-		input_data: struct of data that MUST include M and T, but otherwise
+		Parameters
+		-----------
+		input_data: struct of data that MUST include M and T.  These can either be arrays or floats.
 		i_args: input arguments to maghydrostar from runaway.py/make_runaway
 		backcalculate: backcalculate gradients and convective values
 		**kwargs: any additional arguments passable to class initialization function can be passed here.
+
+		Examples
+		--------
+		To load a star with a mass of 1Msun and a dummy central temperature 
+		(replace "class" with maghydrostar or mhs_steve):
+		>>> mystar = class.blankstar({"M": 1.9891e33, "T": 0.})
+		To generate a stellar profile using StarMod.maghydrostar, then read it
+		into blankstar:
+		>>> mystarold = StarMod.maghydrostar(1.9891e33, 1e8)
+		>>> mystar = class.blankstar(myoldstar.data)
+
 		"""
+		try:
+			blnk_M = max(input_data["M"])
+		except:
+			blnk_M = input_data["M"]
+		try:
+			blnk_T_c = input_data["T"][0]
+		except:
+			blnk_T_c = input_data["T"]
 
 		if i_args:
-			dataobj = cls(max(input_data["M"]), input_data["T"][0], magprofile=i_args["magprofile"], omega=i_args["omega"], S_want=False, mintemp=i_args["mintemp"], composition=i_args["composition"], simd_userot=i_args["simd_userot"], simd_usegammavar=i_args["simd_usegammavar"], simd_usegrav=i_args["simd_usegrav"], simd_suppress=i_args["simd_suppress"], nablarat_crit=False, P_end_ratio=i_args["P_end_ratio"], ps_eostol=i_args["ps_eostol"], fakeouterpoint=i_args["fakeouterpoint"], stop_invertererr=i_args["stop_invertererr"], stop_mrat=i_args["stop_mrat"], stop_positivepgrad=i_args["stop_positivepgrad"], densest=False, mass_tol=i_args["mass_tol"], omega_crit_tol=i_args["omega_crit_tol"], nreps=100, stopcount_max=5, dontintegrate=True, verbose=False)
+			dataobj = cls(blnk_M, blnk_T_c, magprofile=i_args["magprofile"], omega=i_args["omega"], S_want=False, mintemp=i_args["mintemp"], composition=i_args["composition"], simd_userot=i_args["simd_userot"], simd_usegammavar=i_args["simd_usegammavar"], simd_usegrav=i_args["simd_usegrav"], simd_suppress=i_args["simd_suppress"], nablarat_crit=False, P_end_ratio=i_args["P_end_ratio"], ps_eostol=i_args["ps_eostol"], fakeouterpoint=i_args["fakeouterpoint"], stop_invertererr=i_args["stop_invertererr"], stop_mrat=i_args["stop_mrat"], stop_positivepgrad=i_args["stop_positivepgrad"], densest=False, mass_tol=i_args["mass_tol"], omega_crit_tol=i_args["omega_crit_tol"], nreps=100, stopcount_max=5, dontintegrate=True, verbose=False)
 		else:
 			dataobj = cls(max(input_data["M"]), input_data["T"][0], dontintegrate=True, **kwargs)
 
@@ -1520,7 +1544,7 @@ class maghydrostar():	#maghydrostar_core):
 		return dataobj
 
 
-	def backcalculate(self, fresh_calc=False):
+	def backcalculate(self):
 		"""For situations where user-inputted R, M, rho, T and B are given, back-calculate.
 		"""
 
@@ -1546,48 +1570,5 @@ class maghydrostar():	#maghydrostar_core):
 				if not self.data.has_key(item):
 					self.data[item] = cp.deepcopy(temp_data[item])
 
-		self.gettimescales(fresh_calc=fresh_calc)
-
-
-	def backcalculate_subloop(self):
-		"""maghydrostar subloop to backcalculate.
-		"""
-
-		datalength = len(self.data["M"])
-		m_step = self.data["M"][1:] - self.data["M"][:-1]
-		m_step = np.concatenate( [m_step, np.array([m_step[-1]])] )
-
-		# Create temporary housing for data
-		temp_data = {"Pgas": np.zeros(datalength),
-					"Sgas": np.zeros(datalength),
-					"Pmag": np.zeros(datalength),
-					"nabla_hydro": np.zeros(datalength),
-					"nabla_mhdr": np.zeros(datalength),
-					}
-
-		if self.simd_usegammavar:
-			self.data["dlngamdlnP"] = np.zeros(datalength)
-			self.data["nd_gamma"] = np.zeros(datalength)
-		if self.simd_usegrav:
-			self.data["dlngdlnP"] = np.zeros(datalength)
-			self.data["nd_grav"] = np.zeros(datalength)
-		if self.simd_userot:
-			self.data["nd_rot"] = np.zeros(datalength)
-
-		for i in range(datalength):
-			[temp_data["Pgas"][i], temp_data["Sgas"][i]] = self.getpress_rhoT(self.data["rho"][i], self.data["T"][i])
-			[dydx, Bfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms]
-			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
-			[dummydy, dummyBfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
-
-			if self.simd_usegammavar:
-				self.data["dlngamdlnP"][i] = nabla_terms["dlngamdlnP"]
-				self.data["nd_gamma"][i] = nabla_terms["nd_gamma"]
-			if self.simd_usegrav:
-				self.data["dlngdlnP"][i] = nabla_terms["dlngdlnP"]
-				self.data["nd_grav"][i] = nabla_terms["nd_grav"]
-			if self.simd_userot:
-				self.data["nd_rot"][i] = nabla_terms["nd_rot"]
-
-		return temp_data
+		self.gettimescales(fresh_calc=True)
 

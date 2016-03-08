@@ -65,7 +65,10 @@ def obtain_model(mystar, i, r_in, verbose=False):
 	return outerr_code
 
 
-def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), mintemp=1e5, S_old=False, mass_tol=1e-6, P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, omega_crit_tol=1e-3, omega_warn=10., om_err_tol=[1e6, 1e7], verbose=True):
+def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), 
+						tog_coul=True, mintemp=1e5, S_old=False, mass_tol=1e-6,
+						P_end_ratio=1e-8, densest=False, L_tol=1e-2, keepstars=False, 
+						omega_crit_tol=1e-3, omega_warn=10., om_err_tol=[1e6, 1e7], verbose=True):
 	"""Obtains runaway of a star of some given mass, magnetic field, and rotation.  Outputs an object (usually several hundred megs large) that includes run inputs as "run_inputs", as well as all stellar output curves (hence its size) under "stars".
 
 	Arguments:
@@ -92,6 +95,7 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 			"mintemp": mintemp,  
 			"S_old": S_old, 
 			"composition": "CO",
+			"tog_coul": tog_coul,
 			"P_end_ratio": P_end_ratio, 
 			"ps_eostol": 1e-8, 
 			"fakeouterpoint": False, 
@@ -109,13 +113,13 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 	if (omega != 0) or r_in["magprofile"]:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
 		mymagzero = magprof.magprofile(None, None, None, None, blankfunc=True)
-		hstar = Star.mhs_steve(r_in["mass"], False, magprofile=mymagzero, omega=0., temp_c=5e6, mintemp=r_in["mintemp"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+		hstar = Star.mhs_steve(r_in["mass"], False, magprofile=mymagzero, omega=0., temp_c=5e6, togglecoulomb=r_in["tog_coul"], mintemp=r_in["mintemp"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 		densest=0.9*hstar.data["rho"][0]
 
 	print "*************Okay, let's make a low-temperature (MHD/rotating) star************"
 	#Rest after this is identical to function call above
 	mystar = Star.mhs_steve(r_in["mass"], False, magprofile=r_in["magprofile"], omega=r_in["omega"], temp_c=5e6,
-				mintemp=r_in["mintemp"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+				togglecoulomb=r_in["tog_coul"], mintemp=r_in["mintemp"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 
 	if r_in["omega"] < 0:
 		print "FOUND critical Omega = {0:.3e}!  We'll use {1:.3e} of this value for the runaway.".format(mystar.omega, r_in["omega_run_rat"])

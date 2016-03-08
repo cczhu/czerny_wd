@@ -3,15 +3,14 @@ import pylab
 from scipy.interpolate import interp1d
 import scipy.integrate as scipyinteg
 import os, sys
-import copy as cp
 import magprofile_mass as magprof
 import myhelm_magstar as myhmag
 import rhoTcontours as rtc
-#from StarModCore import maghydrostar
+import copy
 
 ################HYDROSTAR CLASS###############################
 
-class maghydrostar():	#maghydrostar_core):
+class maghydrostar:
 	"""
 	Magnetohydrostatic star generator.  Generates spherical WDs with 
 	adiabatic temperature profiles using the Helmholtz 
@@ -28,9 +27,9 @@ class maghydrostar():	#maghydrostar_core):
 		then populate S_want (code will then ignore this value and 
 		calculate self-consistent temp_c).
 	magprofile : magnetic profile object.  Defaults to false, meaning no 
-		magnetic field.  To insert a user-defined field, insert a magf object.
-		To generate a field with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas),
-		insert a float equal to delta.		
+		magnetic field.  If derivtype="sim", a magf object containing the 
+		field should be passed.  If derivtype="simcd", magprofile should 
+		equal delta = B^2/(B^2 + 4pi*Gamma1*Pgas).
 	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
 		rotating).  If < 0, attempts to estimate break-up omega with 
 		self.getomegamax(), if >= 0, uses user defined value.
@@ -40,6 +39,8 @@ class maghydrostar():	#maghydrostar_core):
 	mintemp : temperature floor (K), effectively switches from adiabatic 
 		to isothermal profile if reached.
 	composition : "CO", "Mg" or "He" composition.
+	derivtype : derivative function used - either "sim" (default) or "simcd" 
+		(assumes constant magnetic delta = B^2/(B^2 + 4pi*Gamma1*Pgas)).
 	simd_userot : use Solberg-Hoiland deviation from adiabatic temperature 
 		gradient.
 	simd_usegammavar : use gamma = c_P/c_V index magnetic deviation from 
@@ -130,11 +131,11 @@ class maghydrostar():	#maghydrostar_core):
 	>>>     [Mtot, outerr_code] = mystar.integrate_star(dens_c[i], 5e6, 0.0, 
 	>>>					recordstar=True, outputerr=True)
 	>>>     out_dict["M"][i] = Mtot
-	>>>     out_dict["stars"].append(cp.deepcopy(mystar.data))
+	>>>     out_dict["stars"].append(copy.deepcopy(mystar.data))
 	"""
 
 	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
-				S_want=False, mintemp=1e5, composition="CO", togglecoulomb=True,
+				S_want=False, mintemp=1e5, composition="CO", derivtype="sim",
 				simd_userot=True, simd_usegammavar=False, simd_usegrav=False, 
 				simd_suppress=False, nablarat_crit=False, P_end_ratio=1e-8, 
 				ps_eostol=1e-8, fakeouterpoint=False, stop_invertererr=True, 
@@ -150,6 +151,7 @@ class maghydrostar():	#maghydrostar_core):
 		self.mass_tol = mass_tol
 		self.temp_c = temp_c
 		self.nreps = nreps
+		self.derivtype = derivtype
 		self.nablarat_crit = nablarat_crit
 
 		# recent additions to __init__ (formerly were just passed to getstarmodel).
@@ -163,8 +165,6 @@ class maghydrostar():	#maghydrostar_core):
 		self.omega_crit_tol = omega_crit_tol
 		self.L_want = Lwant
 		self.L_tol = L_tol
-
-		self.togglecoulomb = togglecoulomb
 
 		# Remember to print messages
 		self.verbose = verbose
@@ -227,18 +227,24 @@ class maghydrostar():	#maghydrostar_core):
 			print "I noticed you haven't initialized helmholtz.  Doing so now."
 			myhmag.initializehelmholtz()	# ...initialize helmholtz
 
-		# Check if magnetic field should be back-calculated or obtained from spline
-		if type(magprofile) == float or type(magprofile) == np.float64:
-			self.nabladev = magprofile
-			if self.nabladev <= 0.:
-				raise AssertionError("ERROR: if you use a constant delta field, then magprofile must be a positive value!")
+		if self.derivtype == "simcd":
+			if magprofile:
+				self.nabladev = magprofile
+				if type(self.nabladev) != float and type(self.nabladev) != np.float64:
+					raise AssertionError("ERROR: if you use simcd derivtype, then magprofile must be (a float) equal to delta(r) = B^2/(B^2 + 4pi*Gamma1*Pgas)")
+			else:
+				self.nabladev = 0.
 			if self.verbose:
-				print "Derivative WITH CONSTANT DEVIATION RATIO {0:.3e} selected! Using self.nabladev as deviation delta(r) (MM09 Eqn. 4).".format(self.nabladev)
+				print "GT66/MM09 derivative WITH CONSTANT DEVIATION RATIO selected! Using self.nabladev as deviation delta(r) (MM09 Eqn. 4)."
 		else:
-			self.nabladev = False
+			if self.verbose:
+				print "GT66/MM09 derivative selected!"
 		# derivatives_gtsh now handles both constant deviation and user-defined magnetic profile.
 		self.derivatives = self.derivatives_gtsh
 		self.first_deriv = self.first_derivatives_gtsh
+
+		# Set temperature floor - essentially necessary since Helmholtz has a 1000 K temperature floor.
+#		self.mintemp_func = self.mintemp_func_creator()		#lambda x: 1./(np.exp(-100.*(x - 1.125*self.mintemp)/self.mintemp) + 1.)	#**2
 
 		self.data = {}
 		if dontintegrate:
@@ -717,14 +723,15 @@ class maghydrostar():	#maghydrostar_core):
 			integrate_star during the shooting process
 		"""
 
+		if self.derivtype != "simcd":
+			print "getBcnabladevmodel REQUIRES self.simcd to be true!  Quitting!"
+			return
+
 		if mass_user:
 			self.mass_want = mass_user
 
-		# self.nabladev = 0 means use magf for field profile!
-		if nabladev_est <= 0.:
-			print "nabladev_est cannot be less than or equal to zero!"
-			nabladev_est = 0.001
-		self.nabladev = nabladev_est
+		if nabladev_est:
+			self.nabladev = nabladev_est
 		deltadev = self.nabladev
 
 		if self.verbose:
@@ -746,7 +753,7 @@ class maghydrostar():	#maghydrostar_core):
 			deltadev = (Bc_want - Bc)/dBddev
 			self.nabladev += deltadev
 
-			if self.nabladev <= 0.:	# nabladev can't be zero or negative
+			if self.nabladev <= 0.:	# nabladev can't be negative
 				self.nabladev = abs(deltadev)*0.1
 			if self.verbose:
 				print "== dBddev is {0:.6e}, deltadev is {1:.6e}".format(dBddev, deltadev)
@@ -809,14 +816,15 @@ class maghydrostar():	#maghydrostar_core):
 			integrate_star during the shooting process
 		"""
 
+		if self.derivtype != "simcd":
+			print "getEBnabladevmodel REQUIRES self.simcd to be true!  Quitting!"
+			return
+
 		if mass_user:
 			self.mass_want = mass_user
 
-		# self.nabladev = 0 means use magf for field profile!
-		if nabladev_est <= 0.:
-			print "nabladev_est cannot be less than or equal to zero!"
-			nabladev_est = 0.001
-		self.nabladev = nabladev_est
+		if nabladev_est:
+			self.nabladev = nabladev_est
 		deltadev = self.nabladev
 
 		if self.verbose:
@@ -914,62 +922,64 @@ class maghydrostar():	#maghydrostar_core):
 		return np.sqrt(M*self.grav/R**3)
 
 
+	def mintemp_func_creator(self):
+		"""Creates mintemp function.
+		"""
+		def mintemp_func(temp):
+			if temp <= self.mintemp:
+				return 0.
+			elif temp <= 33.*self.mintemp:
+				return 1./(np.exp(-50.*(temp - 1.250*self.mintemp)/self.mintemp) + 1.)
+			return 1.
+		return mintemp_func
+
+
 ###################################### EOS STUFF #######################################
 
 	# EOS functions are passed failtrig as a list (since lists are mutable).
-	def getpress_rhoT(self, dens, temp, failtrig=[-100]):
-		pressure, energy, soundspeed, gammaout, entropy, failtrig[0] = \
-				myhmag.gethelmholtzeos(temp, dens, self.abar, self.zbar, self.togglecoulomb)
+	def getpress_rhoT(self, dens, temp, failtrig=[-100], togglecoulomb=True):
+		pressure,energy,soundspeed,gammaout,entropy,failtrig[0] = myhmag.gethelmholtzeos(temp,dens,self.abar,self.zbar,togglecoulomb)
 		return [pressure, entropy]
 
 
-	def geteosgradients(self, dens, temp, Pchi, failtrig=[-100]):
-		adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s, failtrig[0] = \
-				myhmag.gethelmgrads(temp, dens, Pchi, self.abar, self.zbar, self.togglecoulomb)
+	def geteosgradients(self, dens, temp, Pchi, failtrig=[-100], togglecoulomb=True):
+		adgradred,hydrograd,nu,alpha,delta,Gamma1,cP,cPhydro,c_s,failtrig[0] = myhmag.gethelmgrads(temp,dens,Pchi,self.abar,self.zbar,togglecoulomb)
 		return [adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s]
 
 
-	def getpress_rhoS(self, dens, entropy, failtrig=[-100]):
-		temp, pressure, energy, soundspeed, gammaout, failtrig[0] = \
-				myhmag.geteosinversionsd(dens, self.abar, self.zbar, entropy, self.togglecoulomb)
+	def getpress_rhoS(self, dens, entropy, failtrig=[-100], togglecoulomb=True):
+		temp,pressure,energy,soundspeed,gammaout,failtrig[0] = myhmag.geteosinversionsd(dens,self.abar,self.zbar,entropy,togglecoulomb)
 		return [pressure, temp]
 
-	def getdens_PT(self, press, temp, failtrig=[-100]):
-		dens, energy, soundspeed, gammaout, entropy, failtrig[0] = \
-				myhmag.geteosinversionpt(temp, self.abar, self.zbar, press, self.togglecoulomb)
+	def getdens_PT(self, press, temp, failtrig=[-100], togglecoulomb=True):
+		dens,energy,soundspeed,gammaout,entropy,failtrig[0] = myhmag.geteosinversionpt(temp,self.abar,self.zbar,press, togglecoulomb)
 		return [dens, entropy]
 
 
-	def getdens_PS(self, press, entropy, failtrig=[-100]):
-		temp, dens, energy, soundspeed, gammaout, failtrig[0] = \
-				myhmag.geteosinversionsp(self.abar, self.zbar, press, entropy, True, self.togglecoulomb)
+	def getdens_PS(self, press, entropy, failtrig=[-100], togglecoulomb=True):
+		temp,dens,energy,soundspeed,gammaout,failtrig[0] = myhmag.geteosinversionsp(self.abar,self.zbar,press,entropy,True,togglecoulomb)
 		return [dens, temp]
 
 
-	def getdens_PS_est(self, press, entropy, failtrig=[-100], dens_est=1e6, temp_est=1e7, eostol=1e-8):
+	def getdens_PS_est(self, press, entropy, failtrig=[-100], dens_est=1e6, temp_est=1e7, togglecoulomb=True, eostol=1e-8):
 		"""Identical to getdens_PS, but uses user-defined estimates to help with the Newton-Raphson algorithm.
 		"""
-		temp, dens, energy, soundspeed, gammaout, failtrig[0] = \
-				myhmag.geteosinversionsp_withest(self.abar, self.zbar, dens_est, temp_est, press, 
-													entropy, True, self.togglecoulomb, eostol)
+		temp,dens,energy,soundspeed,gammaout,failtrig[0] = myhmag.geteosinversionsp_withest(self.abar,self.zbar,dens_est,temp_est,press,entropy,True,togglecoulomb, eostol)
 		return [dens, temp, gammaout]
 
 
-	def getgamma_PD(self, dens, press, failtrig=[-100]):
+	def getgamma_PD(self, dens, press, failtrig=[-100], togglecoulomb=True):
 		"""Obtains Gamma_1 = dP/drho_ad estimate for first_derivatives functions.
 		"""
-		temp_dummy, energy_dummy, soundspeed_dummy, Gamma1_est, entropy_dummy, failtrig[0] = \
-				myhmag.geteosinversionpd(dens, self.abar, self.zbar, press, self.togglecoulomb)
+		temp_dummy,energy_dummy,soundspeed_dummy,Gamma1_est,entropy_dummy,failtrig[0] = myhmag.geteosinversionpd(dens,self.abar,self.zbar,press,togglecoulomb)
 		return Gamma1_est
 
 
-	def gethelmeos_energies(self, dens, temp, failtrig=[-100]):
+	def gethelmeos_energies(self, dens, temp, failtrig=[-100], togglecoulomb=True):
 		"""Obtains Gamma_1 = dP/drho_ad estimate for first_derivatives functions.
 		"""
-		press_dumm, e_int, c_s, gamma_dumm, ent_dumm, dummyfail1 = \
-				myhmag.gethelmholtzeos(temp, dens, self.abar, self.zbar, self.togglecoulomb)
-		press_dumm, e_deg, sound_dumm, gamma_dumm, ent_dumm, dummyfail2 = \
-				myhmag.gethelmholtzeos(1000., dens, self.abar, self.zbar, self.togglecoulomb)
+		press_dumm,e_int,c_s,gamma_dumm,ent_dumm,dummyfail1 = myhmag.gethelmholtzeos(temp,dens,self.abar,self.zbar,togglecoulomb)
+		press_dumm,e_deg,sound_dumm,gamma_dumm,ent_dumm,dummyfail2 = myhmag.gethelmholtzeos(1000.,dens,self.abar,self.zbar,togglecoulomb)
 		if dummyfail1 or dummyfail2:
 			failtrig[0] = 1
 		return [e_int, e_deg, c_s]
@@ -996,11 +1006,15 @@ class maghydrostar():	#maghydrostar_core):
 		dydx[1] = -self.grav*mass/(4.*np.pi*R**4.) + 1./(6.*np.pi)*omega**2/R	# -Pchi_grad*dydx[0]
 
 		# Obtain magnetic field
-		if self.nabladev:
+		if self.derivtype == "simcd":
 			Bfld = np.sqrt(4.*np.pi*Gamma1*press*self.nabladev/(1. - self.nabladev))
 		else:
 			Bfld = self.magf.fBfld(R, mass)
 		Pchi = (1./8./np.pi)*Bfld**2
+
+#		#insurance policy in case -d\rho/dT diverges
+#		mintemp_func_current = self.mintemp_func(temp)
+#		Bfld = mintemp_func_current*Bfld
 
 		nabla_terms = {}
 
@@ -1065,7 +1079,7 @@ class maghydrostar():	#maghydrostar_core):
 		[adgradred_dumm, hydrograd, nu_dumm, alpha_dumm, delta, Gamma1, cP_dumm, cPhydro_dumm, c_s_dumm] = self.geteosgradients(dens, Tc, 0.)	# Central rho, T, and current magnetic pressure since dP/dr = 0 for first step.  Now uses Pchi = 0.
 
 		# Obtain magnetic field
-		if self.nabladev:
+		if self.derivtype == "simcd":
 			Bfld = np.sqrt(4.*np.pi*Gamma1*Pc*self.nabladev/(1. - self.nabladev))
 		else:
 			Bfld = self.magf.fBfld(R, M)
@@ -1078,7 +1092,7 @@ class maghydrostar():	#maghydrostar_core):
 		# magnetic field gamma and gravitational terms
 		if self.simd_usegammavar:
 			if Tc > self.mintemp and not self.simd_suppress:
-				Gamma1_est = self.getgamma_PD(dens, P, failtrig=failtrig)
+				Gamma1_est = self.getgamma_PD(dens, P, failtrig=failtrig, togglecoulomb=True)
 				nabla_terms["dlngamdlnP"] = (Pc/Gamma1)*(Gamma1_est - Gamma1)/(P - Pc)		# dlngamma/dlnP = (P/gamma)*(dgamma/dP)
 				nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*Pc)*nabla_terms["dlngamdlnP"]
 				deviation += nabla_terms["nd_gamma"]
@@ -1134,10 +1148,6 @@ class maghydrostar():	#maghydrostar_core):
 		omega : solid-body angular speed (rad/s)
 		outputerr : output any error codes received from integrator
 		"""
-
-		# If we use self.nabladev make sure it isn't negative
-		if self.nabladev:
-			assert self.nabladev > 0.
 
 		stepsize = max(self.mass_want,0.4*self.Msun)*0.01*min(self.mass_tol, 1e-6)	# Found out the hard way that if you use simd_usegammavar, having a large mass_tol can cause errors
 
@@ -1378,7 +1388,7 @@ class maghydrostar():	#maghydrostar_core):
 		return outarr
 
 
-	def getenergies(self):
+	def getenergies(self, togglecoulomb=True):
 		"""Obtains specific energies (lower case e), total energies (upper case E) and soundspeeds
 		"""
 
@@ -1386,7 +1396,9 @@ class maghydrostar():	#maghydrostar_core):
 		self.data["edeg"] = np.zeros(len(self.data["rho"]))
 		self.data["c_s"] = np.zeros(len(self.data["rho"]))
 		for i in range(len(self.data["rho"])):
-			[self.data["eint"][i], self.data["edeg"][i], self.data["c_s"][i]] = self.gethelmeos_energies(self.data["rho"][i], self.data["T"][i])
+#			pressure,self.data["eint"][i],self.data["c_s"][i],gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(self.data["T"][i],self.data["rho"][i],self.abar,self.zbar,togglecoulomb)
+#			pressure,self.data["edeg"][i],soundspeed,gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(1000.,self.data["rho"][i],self.abar,self.zbar,togglecoulomb)
+			[self.data["eint"][i], self.data["edeg"][i], self.data["c_s"][i]] = self.gethelmeos_energies(self.data["rho"][i], self.data["T"][i], togglecoulomb=togglecoulomb)
 		self.data["eth"] = self.data["eint"] - self.data["edeg"]
 		self.data["erot"] = (2./3.)*self.data["R"]**2*self.omega**2		# specific rotational energy I*omega^2/m = 2/3*r^2*omega^2
 
@@ -1399,7 +1411,7 @@ class maghydrostar():	#maghydrostar_core):
 		self.data["EB"] = 0.5*scipyinteg.cumtrapz(self.data["B"]**2*self.data["R"]**2, x=self.data["R"], initial=0.)
 
 
-	def getgradients(self):
+	def getgradients(self, togglecoulomb=True):
 		"""Obtains magnetohydrostatic gradients for diagnosing stellar structures.  Requires a profile to have already been made (but can be run on partially complete sets).
 		"""
 
@@ -1429,7 +1441,7 @@ class maghydrostar():	#maghydrostar_core):
 		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
 
 
-	def getconvection(self, fresh_calc=False):
+	def getconvection(self, togglecoulomb=True, fresh_calc=False):
 		"""Obtains convective structure, calculated using a combination of Eqn. 9 of Piro & Chang 08 and modified mixing length theory (http://adama.astro.utoronto.ca/~cczhu/runawaywiki/doku.php?id=magderiv#modified_limiting_cases_of_convection).  Currently doesn't account for magnetic energy in any way, so may not be consistent with MHD stars.
 		"""
 
@@ -1506,13 +1518,13 @@ class maghydrostar():	#maghydrostar_core):
 		"""
 
 		if i_args:
-			dataobj = cls(max(input_data["M"]), input_data["T"][0], magprofile=i_args["magprofile"], omega=i_args["omega"], S_want=False, mintemp=i_args["mintemp"], composition=i_args["composition"], simd_userot=i_args["simd_userot"], simd_usegammavar=i_args["simd_usegammavar"], simd_usegrav=i_args["simd_usegrav"], simd_suppress=i_args["simd_suppress"], nablarat_crit=False, P_end_ratio=i_args["P_end_ratio"], ps_eostol=i_args["ps_eostol"], fakeouterpoint=i_args["fakeouterpoint"], stop_invertererr=i_args["stop_invertererr"], stop_mrat=i_args["stop_mrat"], stop_positivepgrad=i_args["stop_positivepgrad"], densest=False, mass_tol=i_args["mass_tol"], omega_crit_tol=i_args["omega_crit_tol"], nreps=100, stopcount_max=5, dontintegrate=True, verbose=False)
+			dataobj = cls(max(input_data["M"]), input_data["T"][0], magprofile=i_args["magprofile"], omega=i_args["omega"], S_want=False, mintemp=i_args["mintemp"], composition=i_args["composition"], derivtype=i_args["derivtype"], simd_userot=i_args["simd_userot"], simd_usegammavar=i_args["simd_usegammavar"], simd_usegrav=i_args["simd_usegrav"], simd_suppress=i_args["simd_suppress"], nablarat_crit=False, P_end_ratio=i_args["P_end_ratio"], ps_eostol=i_args["ps_eostol"], fakeouterpoint=i_args["fakeouterpoint"], stop_invertererr=i_args["stop_invertererr"], stop_mrat=i_args["stop_mrat"], stop_positivepgrad=i_args["stop_positivepgrad"], densest=False, mass_tol=i_args["mass_tol"], omega_crit_tol=i_args["omega_crit_tol"], nreps=100, stopcount_max=5, dontintegrate=True, verbose=False)
 		else:
 			dataobj = cls(max(input_data["M"]), input_data["T"][0], dontintegrate=True, **kwargs)
 
 		dataobj.data = {}
 		for item in input_data.keys():
-			dataobj.data[item] = cp.deepcopy(input_data[item])	#though shallow copying would have worked too
+			dataobj.data[item] = copy.deepcopy(input_data[item])	#though shallow copying would have worked too
 
 		if backcalculate:
 			dataobj.backcalculate()
@@ -1520,7 +1532,7 @@ class maghydrostar():	#maghydrostar_core):
 		return dataobj
 
 
-	def backcalculate(self, fresh_calc=False):
+	def backcalculate(self, togglecoulomb=True, fresh_calc=False):
 		"""For situations where user-inputted R, M, rho, T and B are given, back-calculate.
 		"""
 
@@ -1536,58 +1548,48 @@ class maghydrostar():	#maghydrostar_core):
 		if self.data.has_key("S"):
 			self.data["Sgas"] = self.data["S"]
 
+		datalength = len(self.data["M"])
+
 		# But if we don't seem to have the standard faire values always printed out, just re-calculate them (yes, that means we do overwrite the ones we do have)
 		if not np.prod(np.array([self.data.has_key(x) for x in ["Pgas", "Sgas", "Pmag", "nabla_hydro", "nabla_mhdr"]])):
 			print "WARNING - I didn't find Pgas, Sgas, Pmag, nabla_hydro, or nabla_mhdr in your input - recalculating (including deviations)!"
 			
-			temp_data = self.backcalculate_subloop()
+			m_step = self.data["M"][1:] - self.data["M"][:-1]
+			m_step = np.concatenate( [m_step, np.array([m_step[-1]])] )
+
+			# Create temporary housing for data
+			temp_data = {"Pgas": np.zeros(datalength),
+						"Sgas": np.zeros(datalength),
+						"Pmag": np.zeros(datalength),
+						"nabla_hydro": np.zeros(datalength),
+						"nabla_mhdr": np.zeros(datalength),
+						}
+			if self.simd_usegammavar:
+				self.data["dlngamdlnP"] = np.zeros(datalength)
+				self.data["nd_gamma"] = np.zeros(datalength)
+			if self.simd_usegrav:
+				self.data["dlngdlnP"] = np.zeros(datalength)
+				self.data["nd_grav"] = np.zeros(datalength)
+			if self.simd_userot:
+				self.data["nd_rot"] = np.zeros(datalength)
+
+			for i in range(datalength):
+				[temp_data["Pgas"][i], temp_data["Sgas"][i]] = self.getpress_rhoT(self.data["rho"][i], self.data["T"][i])
+				[dydx, Bfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms]
+				y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
+				[dummydy, dummyBfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
+
+				if self.simd_usegammavar:
+					self.data["dlngamdlnP"][i] = nabla_terms["dlngamdlnP"]
+					self.data["nd_gamma"][i] = nabla_terms["nd_gamma"]
+				if self.simd_usegrav:
+					self.data["dlngdlnP"][i] = nabla_terms["dlngdlnP"]
+					self.data["nd_grav"][i] = nabla_terms["nd_grav"]
+				if self.simd_userot:
+					self.data["nd_rot"][i] = nabla_terms["nd_rot"]
 
 			for item in temp_data.keys():
 				if not self.data.has_key(item):
-					self.data[item] = cp.deepcopy(temp_data[item])
+					self.data[item] = copy.deepcopy(temp_data[item])
 
 		self.gettimescales(fresh_calc=fresh_calc)
-
-
-	def backcalculate_subloop(self):
-		"""maghydrostar subloop to backcalculate.
-		"""
-
-		datalength = len(self.data["M"])
-		m_step = self.data["M"][1:] - self.data["M"][:-1]
-		m_step = np.concatenate( [m_step, np.array([m_step[-1]])] )
-
-		# Create temporary housing for data
-		temp_data = {"Pgas": np.zeros(datalength),
-					"Sgas": np.zeros(datalength),
-					"Pmag": np.zeros(datalength),
-					"nabla_hydro": np.zeros(datalength),
-					"nabla_mhdr": np.zeros(datalength),
-					}
-
-		if self.simd_usegammavar:
-			self.data["dlngamdlnP"] = np.zeros(datalength)
-			self.data["nd_gamma"] = np.zeros(datalength)
-		if self.simd_usegrav:
-			self.data["dlngdlnP"] = np.zeros(datalength)
-			self.data["nd_grav"] = np.zeros(datalength)
-		if self.simd_userot:
-			self.data["nd_rot"] = np.zeros(datalength)
-
-		for i in range(datalength):
-			[temp_data["Pgas"][i], temp_data["Sgas"][i]] = self.getpress_rhoT(self.data["rho"][i], self.data["T"][i])
-			[dydx, Bfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms]
-			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
-			[dummydy, dummyBfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
-
-			if self.simd_usegammavar:
-				self.data["dlngamdlnP"][i] = nabla_terms["dlngamdlnP"]
-				self.data["nd_gamma"][i] = nabla_terms["nd_gamma"]
-			if self.simd_usegrav:
-				self.data["dlngdlnP"][i] = nabla_terms["dlngdlnP"]
-				self.data["nd_grav"][i] = nabla_terms["nd_grav"]
-			if self.simd_userot:
-				self.data["nd_rot"][i] = nabla_terms["nd_rot"]
-
-		return temp_data
-

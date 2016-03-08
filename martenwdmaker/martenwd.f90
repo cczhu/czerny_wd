@@ -1,1305 +1,144 @@
-!myhelmstarmod.f90 connects Helmholtz EOS to StarMod.py.  Compile with:
-!f2py  -m myhelmstarmod -c myhelmstarmod.f90
-!OR
-!f2py --fcompiler=gnu95 -m myhelmstarmod -c myhelmstarmod.f90
-
-!
-! Initialized the helmholtz equation of state
-!
-      subroutine initializeHelmholtz
-      
+      program helmholtzwd
+! can make isentropic WD
+! cold WD 3.4298e7 1e3:   M(rho>1e7)=0.501 Msun, Mtot=1.032 Msun
+! hot  WD 2.45e7 3.02e9:             0.500            1.449
+! rot  WD 2.88e7 1.5e9 0.642         0.500            1.290 
       include 'implno.dek'
-      include 'starmod_vector_eos.dek'
+      include 'vector_eos.dek'
 
+! tests the eos routine
+! 
+! ionmax  = number of isotopes in the network
+! xmass   = mass fraction of isotope i
+! aion    = number of nucleons in isotope i
+! zion    = number of protons in isotope i
+
+      integer          ionmax
+      parameter        (ionmax=2)
+      double precision xmass(ionmax),aion(ionmax),zion(ionmax),temp,den,abar,zbar
+      character string*80
+      double precision dc,twd,dr,x,y(2),ynew(2),dydx(2),G,pi
+      parameter(pi=3.141592653589793d0,G=6.67e-8)
+      double precision omega
+      logical isentropic
+      common/passon/omega,isentropic
+      
+      isentropic = .true.
+
+! set the mass fractions, z's and a's of the composition
+! hydrogen, heliu, and carbon
+      xmass(1) = 0.5d0 ; aion(1)  = 12.0d0  ; zion(1)  = 6.0d0
+      xmass(2) = 0.5d0 ; aion(2)  = 16.0d0  ; zion(2)  = 8.0d0
+
+! read the data table
       call read_helm_table
 
-      return
-      end
-
-!
-! get the values of the equation of state.  we need FAILTRIG rather that just EOSFAIL because f2py doesn't
-! seem to be able to output EOSFAIL
-! 
-      subroutine getHelmholtzEOS( temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy, failtrig, togglecoulomb )
-
-      include 'implno.dek'
-      include 'starmod_vector_eos.dek'
-
-      double precision temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy
-      logical failtrig, togglecoulomb, togglecoulomb_two
-      common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) pressure,energy, soundspeed, gammaout, entropy, failtrig
- 
-      temp_row(1) = temp ; den_row(1)  = dens ; abar_row(1) = abar ; zbar_row(1) = zbar
-      jlo_eos = 1 ; jhi_eos = 1
-
-      togglecoulomb_two = togglecoulomb
-
-      call helmeos
-      pressure = ptot_row(1)
-      energy = etot_row(1)
-      soundspeed = cs_row(1)
-      gammaout = gam1_row(1)
-      entropy = stot_row(1)
-
-      failtrig = eosfail
-
-!pion = pion_row(1)
-
-!temp = pion/(avogadro's number*kb/abar)
-
-      return
-      end
-
-
-      subroutine gethelmgrads( temp, dens, magPchi, abar, zbar, adgradred, &
-					hydrograd, my_nu, my_alpha, my_delta, my_gamma1, &
-					my_cp, my_cph, my_c_s, failtrig, togglecoulomb )
-
-      include 'implno.dek'
-      include 'starmod_vector_eos.dek'
-
-      double precision temp, dens, magPchi, abar, zbar, adgradred
-      double precision my_alpha, my_cp, my_drhodt, Pchi_over_dens, my_delta, my_nu, hydrograd
-      double precision my_gamma1, my_cph, my_c_s
-      logical failtrig, togglecoulomb, togglecoulomb_two
-      common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) adgradred, my_nu, my_alpha, my_delta, hydrograd, my_gamma1, my_cp, my_cph, my_c_s, failtrig
- 
-      temp_row(1) = temp ; den_row(1)  = dens ; abar_row(1) = abar ; zbar_row(1) = zbar
-      jlo_eos = 1 ; jhi_eos = 1
-
-      togglecoulomb_two = togglecoulomb
-
-      call helmeos
-
-      Pchi_over_dens = magPchi/dens
-      my_drhodt = -dpt_row(1)/(dpd_row(1) + Pchi_over_dens)
-      my_cp = det_row(1) + (ded_row(1) - ptot_row(1)/dens**2)*my_drhodt
-      my_cph = cp_row(1)
-      my_delta = -temp/dens*my_drhodt
-      my_alpha = (ptot_row(1) + magPchi)/dens*(dpd_row(1) + Pchi_over_dens)**(-1)
-      my_nu = magPchi/(dens*dpd_row(1) + magPchi)
-      my_c_s = cs_row(1)
-
-	  adgradred = my_delta/dens/my_cp		!T/P_T*nabla_ad
-
-	  hydrograd = nabad_row(1)	!nabla_ad(hydro), just in case
-
-      my_gamma1 = gam1_row(1)
-
-      failtrig = eosfail
-
-      return
-      end
-
-
-      subroutine gethelmgraddiag( temp, dens, magPchi, abar, zbar, &
-							my_cp, my_delta, my_alpha, my_nu, adgrad, hydrograd, &
-							failtrig, togglecoulomb, togglewrite )
-
-      include 'implno.dek'
-      include 'starmod_vector_eos.dek'
-
-      double precision temp, dens, magPchi, abar, zbar, adgrad, nu_over_alpha
-      double precision my_alpha, my_cp, my_drhodt, Pchi_over_dens, my_delta, my_nu
-      double precision hydrograd
-      logical failtrig, togglecoulomb, togglecoulomb_two, togglewrite
-      common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) my_cp, my_delta, my_alpha, my_nu, adgrad, hydrograd, failtrig
-
-47    format(1x,t2,a,1p10e16.8)
- 
-      temp_row(1) = temp ; den_row(1)  = dens ; abar_row(1) = abar ; zbar_row(1) = zbar
-      jlo_eos = 1 ; jhi_eos = 1
-
-      togglecoulomb_two = togglecoulomb
-
-      call helmeos
-
-      Pchi_over_dens = magPchi/dens
-      my_drhodt = -dpt_row(1)/(dpd_row(1) + Pchi_over_dens)
-      my_cp = det_row(1) + (ded_row(1) - ptot_row(1)/dens**2)*my_drhodt
-      my_delta = -temp/dens*my_drhodt
-      my_alpha = (ptot_row(1) + magPchi)/dens*(dpd_row(1) + Pchi_over_dens)**(-1)
-      my_nu = magPchi/(dens*dpd_row(1) + magPchi)
-
-	  adgrad = (ptot_row(1) + magPchi)*my_delta/dens/my_cp/temp
-	  hydrograd = nabad_row(1)
-
-      failtrig = eosfail
-
-	  if(togglewrite) then
-		  write(6,47) 'Printing out details: '
-		  write(6,47) 'In order: Pchi/rho, drho/dT, cP, delta, alpha, nu, nu/alpha, nabla_ad'
-		  write(6,47) '=', Pchi_over_dens, my_drhodt, &
-		             my_cp,my_delta,my_alpha,my_nu,nu_over_alpha,adgrad
-
-		  write(6,47) 'cP test:'
-		  write(6,47) 'hydrodynamic c_P =', cp_row(1)
-		  write(6,47) 'My c_P =', my_cp
-
-		  write(6,47) 'Adiabatic gradient test:'
-		  write(6,47) 'hydrodynamic nabla_ad =', hydrograd
-		  write(6,47) 'my nabla_ad =', adgrad
-
-		  write(6,47) 'Gamma test:'
-		  write(6,47) '1/gamma1 =', 1.0d0/gam1_row(1)
-		  write(6,47) 'alpha - delta*nabla_ad =', my_alpha - my_delta*adgrad*(ptot_row(1) + magPchi)/temp
-	  end if
-
-      return
-      end
-
-
-      subroutine getEOSInversion( temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy, failtrig, togglecoulomb )
-
-      include 'implno.dek'
-      include 'starmod_vector_eos.dek'
-
-      double precision temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy
-      logical failtrig, togglecoulomb, togglecoulomb_two
-      common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) pressure,temp, soundspeed, gammaout,entropy,failtrig
-
-!      write(*,*) dens,'\t',energy,'\t',abar,'\t',zbar,'\n'
-
-!Guess an initial temperature of 1e7
-      temp_row(1) = 1e7 ; den_row(1)  = dens ; abar_row(1) = abar ; zbar_row(1) = zbar
-      etot_row(1) = energy
-      jlo_eos = 1 ; jhi_eos = 1
-
-!      write(*,*) den_row(1),etot_row(1),abar_row(1),zbar_row(1)
-
-      togglecoulomb_two = togglecoulomb
-
-      call invert_helm_ed
-
-      pressure = ptot_row(1)
-      temp = temp_row(1)
-      soundspeed = cs_row(1)
-      gammaout = gam1_row(1)
-      entropy = stot_row(1)
-
-      failtrig = eosfail
-
-      if (eosinvertfail .eqv. .true.) then
-		failtrig = eosinvertfail
-      end if
-
-      return
-      end
-
-      subroutine invert_helm_ed
-      include 'implno.dek'
-      include 'const.dek'
-      include 'starmod_vector_eos.dek'
-
-
-! given the specific internal energy density, density, and composition
-! find everything else
-
-! it is assumed that etot_row(j), den_row(j), abar_row(j),
-! zbar_row(j), and the pipe limits (jlo_eos:jhi_eos), have
-! been set before calling this routine.
-
-! on input temp_row(j) conatins a guess for the temperature,
-! on output temp_row(j) contains the converged temperature.
-
-! To get the greatest speed advantage, the eos should be fed a
-! large pipe of data to work on.
-
-
-! local variables
-      integer          i,j,jlo_save,jhi_save
-      double precision tmpold,tmp,f,df,tmpnew,eostol,eostola,fpmin
-      parameter        (eostola = 1.0d-8, &
-                        fpmin  = 1.0d-14)
-
-
-!Switching these values to "e" instead of "d" makes a difference!?
-      if(den_row(1) .lt. 1.0e10) then
-	eostol = 1.0e-8
-      elseif(den_row(1) .ge. 1.0e10 .and. &
-		den_row(1) .lt. 1.0e12) then
-	eostol = 1.0e-7
-      elseif(den_row(1) .ge. 1.0e12) then
-	eostol = 1.0e-6
-      endif
-
-	eosinvertfail = .false.
-
-!      write(*,*) den_row(1),etot_row(1),abar_row(1),zbar_row(1)
-
-! initialize
-      jlo_save = jlo_eos
-      jhi_save = jhi_eos
-      do j=jlo_eos, jhi_eos
-       eoswrk01(j) = 0.0d0
-       eoswrk02(j) = 0.0d0
-       eoswrk03(j) = etot_row(j)
-       eoswrk04(j) = temp_row(j)
-      end do
-
-
-! do the first newton loop with all elements in the pipe
-
-      call helmeos
-
-      do j = jlo_eos, jhi_eos
-
-       f     = etot_row(j)/eoswrk03(j) - 1.0d0
-       df    = det_row(j)/eoswrk03(j)
-
-       eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-       tmp    = temp_row(j)
-       tmpnew = min(max(0.5d0*tmp,tmp - eoswrk02(j)),2.0d0*tmp)
-
-! compute the error
-       eoswrk01(j)  = abs((tmpnew - tmp)/tmp)
-
-! store the new temperature, keep it within the table limits
-       temp_row(j)  = min(1.0d14,max(tmpnew,1.0d-11))
-
-
-      enddo
-
-
-
-! now loop over each element of the pipe individually
-      do j = jlo_save, jhi_save
-
-       do i=2,40
-
-        if (eoswrk01(j) .lt. eostol .or. &
-            abs(eoswrk02(j)) .le. fpmin) goto 20
-
-        jlo_eos = j
-        jhi_eos = j
-
-        call helmeos
-
-        f     = etot_row(j)/eoswrk03(j) - 1.0d0
-        df    = det_row(j)/eoswrk03(j)
-
-        eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-        tmp    = temp_row(j)
-        tmpnew = min(max(0.5d0*tmp,tmp - eoswrk02(j)),2.0d0*tmp)
-
-! compute the error
-        eoswrk01(j)  = abs((tmpnew - tmp)/tmp)
-
-! store the new density, keep it within the table limits
-        temp_row(j)  = min(1.0d13,max(tmpnew,1.0d3))
-
-
-! end of netwon loop
-       end do
-
-
-! we did not converge if we land here
-      write(6,*)
-      write(6,*) 'newton-raphson failed in routine invert_helm_ed'
-      write(6,*) 'pipeline element',j
- 01   format(1x,5(a,1pe16.8))
-      write(6,01) 'error =',eoswrk01(j), &
-                  '  eostol=',eostol,'  fpmin =',fpmin
-      write(6,01) 'temp   =',temp_row(j),'  temp_estimate=',eoswrk04(j)
-      write(6,01) 'f/df  =',eoswrk02(j),' f   =',f,    ' df    =',df
-      write(6,01) 'density = ',den_row(j)
-      write(6,01) 'energy  =',eoswrk03(j)
-      write(6,*)
-      eosinvertfail = .true.
-!      stop 'could not find a temperature in routine invert_helm_ed'
-
-
-
-! land here if newton loop converged, back for another pipe element
- 20    continue
-      end do
-
-
-
-! call eos one more time with the converged value of the density
-
-      jlo_eos = jlo_save
-      jhi_eos = jhi_save
-
-      call helmeos
-
-      return
-      end
-
-
-      subroutine getEOSInversionSD( temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy, &
-         failtrig, togglecoulomb )
-
-      include 'implno.dek'
-      include 'starmod_vector_eos.dek'
-
-      double precision temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy
-      logical failtrig, togglecoulomb, togglecoulomb_two
-      common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) pressure,temp,energy, soundspeed, gammaout,failtrig
-
-!      write(*,*) dens,'\t',energy,'\t',abar,'\t',zbar,'\n'
-
-!Guess an initial temperature of 1e7
-      temp_row(1) = 1e7 ; den_row(1)  = dens ; abar_row(1) = abar ; zbar_row(1) = zbar
-      stot_row(1) = entropy
-      jlo_eos = 1 ; jhi_eos = 1
-
-!      write(*,*) den_row(1),etot_row(1),abar_row(1),zbar_row(1)
-
-      togglecoulomb_two = togglecoulomb
-
-      call invert_helm_sd
-
-      pressure = ptot_row(1)
-      temp = temp_row(1)
-      soundspeed = cs_row(1)
-      gammaout = gam1_row(1)
-      entropy = stot_row(1)
-      energy = etot_row(1)
-
-      failtrig = eosfail
-
-      if (eosinvertfail .eqv. .true.) then
-		failtrig = eosinvertfail
-      end if
-
-      return
-      end
-
-
-      subroutine invert_helm_sd
-      include 'implno.dek'
-      include 'const.dek'
-      include 'starmod_vector_eos.dek'
-
-! THIS IS FROM ME, NOT FRANK TIMMES, AND THEREFORE IS FAILURE PRONE
-
-! given the entropy density, density, and composition
-! find everything else
-
-! it is assumed that stot_row(j), den_row(j), abar_row(j),
-! zbar_row(j), and the pipe limits (jlo_eos:jhi_eos), have
-! been set before calling this routine.
-
-! on input temp_row(j) conatins a guess for the temperature,
-! on output temp_row(j) contains the converged temperature.
-
-! To get the greatest speed advantage, the eos should be fed a
-! large pipe of data to work on.
-
-
-! local variables
-      integer          i,j,jlo_save,jhi_save
-      double precision tmpold,tmp,f,df,tmpnew,eostol,eostola,fpmin
-      parameter        (eostola = 1.0d-8, &
-                        fpmin  = 1.0d-14)
-
-
-!Switching these values to "e" instead of "d" makes a difference!?
-      if(den_row(1) .lt. 1.0e10) then
-	eostol = 1.0e-8
-      elseif(den_row(1) .ge. 1.0e10 .and. &
-		den_row(1) .lt. 1.0e12) then
-	eostol = 1.0e-7
-      elseif(den_row(1) .ge. 1.0e12) then
-	eostol = 1.0e-6
-      endif
-
-    eosinvertfail = .false.
-
-!      write(*,*) den_row(1),etot_row(1),abar_row(1),zbar_row(1)
-
-! initialize
-      jlo_save = jlo_eos
-      jhi_save = jhi_eos
-      do j=jlo_eos, jhi_eos
-       eoswrk01(j) = 0.0d0
-       eoswrk02(j) = 0.0d0
-       eoswrk03(j) = stot_row(j)
-       eoswrk04(j) = temp_row(j)
-      end do
-
-
-! do the first newton loop with all elements in the pipe
-
-      call helmeos
-
-      do j = jlo_eos, jhi_eos
-
-       f     = stot_row(j)/eoswrk03(j) - 1.0d0
-       df    = dst_row(j)/eoswrk03(j)
-
-       eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-       tmp    = temp_row(j)
-       tmpnew = min(max(0.5d0*tmp,tmp - eoswrk02(j)),2.0d0*tmp)
-
-! compute the error
-       eoswrk01(j)  = abs((tmpnew - tmp)/tmp)
-
-! store the new temperature, keep it within the table limits
-       temp_row(j)  = min(1.0d14,max(tmpnew,1.0d-11))
-
-
-      enddo
-
-
-
-! now loop over each element of the pipe individually
-      do j = jlo_save, jhi_save
-
-       do i=2,40
-
-        if (eoswrk01(j) .lt. eostol .or. &
-            abs(eoswrk02(j)) .le. fpmin) goto 20
-
-        jlo_eos = j
-        jhi_eos = j
-
-        call helmeos
-
-        f     = stot_row(j)/eoswrk03(j) - 1.0d0
-        df    = dst_row(j)/eoswrk03(j)
-
-        eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-        tmp    = temp_row(j)
-        tmpnew = min(max(0.5d0*tmp,tmp - eoswrk02(j)),2.0d0*tmp)
-
-! compute the error
-        eoswrk01(j)  = abs((tmpnew - tmp)/tmp)
-
-! store the new density, keep it within the table limits
-        temp_row(j)  = min(1.0d13,max(tmpnew,1.0d3))
-
-
-! end of netwon loop
-       end do
-
-
-! we did not converge if we land here
-      write(6,*)
-      write(6,*) 'newton-raphson failed in routine invert_helm_sd'
-      write(6,*) 'pipeline element',j
- 01   format(1x,5(a,1pe16.8))
-      write(6,01) 'error =',eoswrk01(j), &
-                  '  eostol=',eostol,'  fpmin =',fpmin
-      write(6,01) 'temp   =',temp_row(j),'  temp_estimate=',eoswrk04(j)
-      write(6,01) 'f/df  =',eoswrk02(j),' f   =',f,    ' df    =',df
-      write(6,01) 'density = ',den_row(j)
-      write(6,01) 'entropy  =',eoswrk03(j)
-      write(6,*)
-      eosinvertfail = .true.
-!      stop 'could not find a temperature in routine invert_helm_ed'
-
-
-
-! land here if newton loop converged, back for another pipe element
- 20    continue
-      end do
-
-
-
-! call eos one more time with the converged value of the density
-
-      jlo_eos = jlo_save
-      jhi_eos = jhi_save
-
-      call helmeos
-
-      return
-      end
-
-
-
-      subroutine getEOSInversionSP( temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, &
-	entropy, warninglabel, failtrig, togglecoulomb )
-
-      include 'implno.dek'
-      include 'starmod_vector_eos.dek'
-
-      double precision temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy
-      double precision f, df
-      logical failtrig, togglecoulomb, togglecoulomb_two
-      common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) dens,temp,energy, soundspeed, gammaout,failtrig
-      double precision deltaTemp, newTemp, oldTemp
-      double precision eostol, fpmin
-      parameter (eostol = 1.0d-8, fpmin  = 1.0d-14)
-      integer j, MAXTRIES, numTries, nhit, warninglabel
-      parameter (MAXTRIES = 100)
-      double precision newdeltadens, olddeltadens, olddens
-
-!      write(*,*) dens,'\t',energy,'\t',abar,'\t',zbar,'\n'
-
-!Guess an initial temperature of 1e7
-      
-!      write(*,*) den_row(1),etot_row(1),abar_row(1),zbar_row(1)
-
-      eosinvertfail = .false.
-
-      togglecoulomb_two = togglecoulomb
-
-      ! first guess a temperature and get correct pressure and density
-      jlo_eos = 1 ; jhi_eos = 1
-      
-      ptot_row(1)  = pressure ; abar_row(1) = abar ; zbar_row(1) = zbar; stot_row(1) = entropy
-
-      newTemp = 1e7 ! initial guess for the temperature
-      den_row(1) = 1e6 ! initial guess for the density
-
-      olddens = den_row(1)
-      oldTemp = 0e0
-      f = 1.0
-      df = 1.0
-
-      numTries = 0
-      olddeltadens = 1.d-10
-      nhit = 0
-
-!      write(*,*) entropy
-      do while( abs((newTemp - oldTemp)/newTemp) .gt. eostol .and. abs(f/df) .gt. fpmin .and. &
-			numTries .lt. MAXTRIES)
-         temp_row(1) = newTemp
-         
-         call invert_helm_pt_quiet
-         
-         f     = stot_row(1)/entropy - 1.0d0
-         df    = dst_row(1)/entropy
-         
-         deltaTemp = f/df
-         oldTemp = newTemp
-!         write(*,*) numTries, den_row(1), temp_row(1), deltaTemp
-
-         newdeltadens = den_row(1) - olddens
-         if(abs(newdeltadens/olddeltadens + 1d0) .lt. 1e-6) then
-                 nhit = nhit + 1
-	         deltaTemp = 0.5**nhit*deltaTemp
-         end if
-         newTemp = min(max(0.5d0*newTemp,newTemp - deltaTemp),2.0d0*newTemp)
-!         write(*,*) deltaTemp, newTemp, oldTemp, den_row(1), f, df
-!         pause
-         numTries = numTries + 1
-         olddens = den_row(1)
-         olddeltadens = newdeltadens
-      end do
-
-!      if (eosinvertfail .eqv. .true.) then
-!		 write(*,*) "EOSInversionSP ERROR! "
-!         write(*,*) "invert_helm_pt_quiet failed at some point."
-!      end if
-      
-      if(numTries .eq. MAXTRIES .and. warninglabel .eq. 1) then
-		 write(*,*) "EOSInversionSP ERROR! "
-         write(*,*) "entropy: ", entropy, "press: ", pressure
-		 write(*,*) "T_current: ", newTemp, "T_prev: ", oldTemp
-		 write(*,*) "dens_current: ", den_row(1), "dens_prev: ", den_row(1) - newdeltadens
-		 eosinvertfail = .true.
-      end if
-      dens = den_row(1)
-      temp = temp_row(1)
-      soundspeed = cs_row(1)
-      gammaout = gam1_row(1)
-      energy = etot_row(1)
-
-      failtrig = eosfail
-
-      if (eosinvertfail .eqv. .true.) then
-		failtrig = eosinvertfail
-      end if
-
-      return
-      end
-
-
-
-      subroutine getEOSInversionPT( temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, &
-         entropy, failtrig, togglecoulomb )
-
-      include 'implno.dek'
-      include 'starmod_vector_eos.dek'
-
-      double precision temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy
-      logical failtrig, togglecoulomb, togglecoulomb_two
-      common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) dens, energy, soundspeed, gammaout,entropy,failtrig
-
-      temp_row(1) = temp ; ptot_row(1) = pressure ; abar_row(1) = abar ; zbar_row(1) = zbar
-      jlo_eos = 1 ; jhi_eos = 1
-
-      togglecoulomb_two = togglecoulomb
-
-      call invert_helm_pt
-
-      dens = den_row(1)
-      energy = etot_row(1)
-      soundspeed = cs_row(1)
-      gammaout = gam1_row(1)
-      entropy = stot_row(1)
-
-      failtrig = eosfail
-
-      if (eosinvertfail .eqv. .true.) then
-		failtrig = eosinvertfail
-      end if
-
-      return
-      end
-
-
-
-      subroutine invert_helm_pt_quiet
-      include 'implno.dek'
-      include 'const.dek'
-      include 'starmod_vector_eos.dek'
-
-
-! given the pressure, temperature, and composition
-! find everything else
-
-! it is assumed that ptot_row(j), temp_row(j), abar_row(j),
-! zbar_row(j), and the pipe limits (jlo_eos:jhi_eos), have
-! been set before calling this routine.
-
-! on input den_row(j) conatins a guess for the density,
-! on output den_row(j) contains the converged density.
-
-! To get the greatest speed advantage, the eos should be fed a
-! large pipe of data to work on.
-
-! this version is quiet on all errors
-
-
-! local variables
-      integer          i,j,jlo_save,jhi_save
-      double precision den,f,df,dennew,eostol,fpmin
-      parameter        (eostol = 1.0d-8, &
-                        fpmin  = 1.0d-14)
-
-
-! initialize
-      jlo_save = jlo_eos
-      jhi_save = jhi_eos
-      do j=jlo_eos, jhi_eos
-       eoswrk01(j) = 0.0d0
-       eoswrk02(j) = 0.0d0
-       eoswrk03(j) = ptot_row(j)
-       eoswrk04(j) = den_row(j)
-      end do
-
-
-! do the first newton loop with all elements in the pipe
-      call helmeos
-
-      do j = jlo_eos, jhi_eos
-
-       f     = ptot_row(j)/eoswrk03(j) - 1.0d0
-       df    = dpd_row(j)/eoswrk03(j)
-       eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-       den    = den_row(j)
-       dennew = min(max(0.5d0*den,den - eoswrk02(j)),2.0d0*den)
-
-! compute the error
-       eoswrk01(j)  = abs((dennew - den)/den)
-
-! store the new density, keep it within the table limits
-       den_row(j)  = min(1.0d14,max(dennew,1.0d-11))
-
-      enddo
-
-
-
-! now loop over each element of the pipe individually
-      do j = jlo_save, jhi_save
-
-       do i=2,40
-
-        if (eoswrk01(j) .lt. eostol .or. &
-            abs(eoswrk02(j)) .le. fpmin) goto 20
-
-        jlo_eos = j
-        jhi_eos = j
-
-        call helmeos
-
-        f     = ptot_row(j)/eoswrk03(j) - 1.0d0
-        df    = dpd_row(j)/eoswrk03(j)
-        eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-        den    = den_row(j)
-        dennew = min(max(0.5d0*den,den - eoswrk02(j)),2.0d0*den)
-
-! compute the error
-        eoswrk01(j)  = abs((dennew - den)/den)
-
-! store the new density, keep it within the table limits
-        den_row(j)  = min(1.0d14,max(dennew,1.0d-11))
-
-! end of netwon loop
-       end do
-
-
-! we did not converge if we land here
-!      eosinvertfail = .true.
-!      stop 'could not find a density in routine invert_helm_pt'
-
-
-
-! land here if newton loop converged, back for another pipe element
- 20    continue
-      end do
-
-
-! call eos one more time with the converged value of the density
-
-      jlo_eos = jlo_save
-      jhi_eos = jhi_save
-
-      call helmeos
-
-      return
-      end
-
-
-      subroutine invert_helm_pt
-      include 'implno.dek'
-      include 'const.dek'
-      include 'starmod_vector_eos.dek'
-
-
-! given the pressure, temperature, and composition
-! find everything else
-
-! it is assumed that ptot_row(j), temp_row(j), abar_row(j),
-! zbar_row(j), and the pipe limits (jlo_eos:jhi_eos), have
-! been set before calling this routine.
-
-! on input den_row(j) conatins a guess for the density,
-! on output den_row(j) contains the converged density.
-
-! To get the greatest speed advantage, the eos should be fed a
-! large pipe of data to work on.
-
-! this version is quiet on all errors
-
-
-! local variables
-      integer          i,j,jlo_save,jhi_save
-      double precision den,f,df,dennew,eostol,fpmin
-      parameter        (eostol = 1.0d-8, &
-                        fpmin  = 1.0d-14)
-
-
-! initialize
-      jlo_save = jlo_eos
-      jhi_save = jhi_eos
-      do j=jlo_eos, jhi_eos
-       eoswrk01(j) = 0.0d0
-       eoswrk02(j) = 0.0d0
-       eoswrk03(j) = ptot_row(j)
-       eoswrk04(j) = den_row(j)
-      end do
-
-      eosinvertfail = .false.
-
-! do the first newton loop with all elements in the pipe
-      call helmeos
-
-      do j = jlo_eos, jhi_eos
-
-       f     = ptot_row(j)/eoswrk03(j) - 1.0d0
-       df    = dpd_row(j)/eoswrk03(j)
-       eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-       den    = den_row(j)
-       dennew = min(max(0.5d0*den,den - eoswrk02(j)),2.0d0*den)
-
-! compute the error
-       eoswrk01(j)  = abs((dennew - den)/den)
-
-! store the new density, keep it within the table limits
-       den_row(j)  = min(1.0d14,max(dennew,1.0d-11))
-
-      enddo
-
-
-
-! now loop over each element of the pipe individually
-      do j = jlo_save, jhi_save
-
-       do i=2,40
-
-        if (eoswrk01(j) .lt. eostol .or. &
-            abs(eoswrk02(j)) .le. fpmin) goto 20
-
-        jlo_eos = j
-        jhi_eos = j
-
-        call helmeos
-
-        f     = ptot_row(j)/eoswrk03(j) - 1.0d0
-        df    = dpd_row(j)/eoswrk03(j)
-        eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-        den    = den_row(j)
-        dennew = min(max(0.5d0*den,den - eoswrk02(j)),2.0d0*den)
-
-! compute the error
-        eoswrk01(j)  = abs((dennew - den)/den)
-
-! store the new density, keep it within the table limits
-        den_row(j)  = min(1.0d14,max(dennew,1.0d-11))
-
-! end of netwon loop
-       end do
-
-
-! we did not converge if we land here
-      write(6,*)
-      write(6,*) 'newton-raphson failed in routine invert_helm_pt'
-      write(6,*) 'pipeline element',j
- 01   format(1x,5(a,1pe16.8))
-      write(6,01) 'error =',eoswrk01(j), &
-                  '  eostol=',eostol,'  fpmin =',fpmin
-      write(6,01) 'den   =',den_row(j),'  den_estimate=', eoswrk04(j)
-      write(6,01) 'f/df  =',eoswrk02(j),' f   =',f,    ' df    =',df
-      write(6,01) 'temp  =',temp_row(j)
-      write(6,01) 'pres  =',eoswrk03(j)
-      write(6,*)
-      eosinvertfail = .true.
-!      stop 'could not find a density in routine invert_helm_pt'
-
-
-
-! land here if newton loop converged, back for another pipe element
- 20    continue
-      end do
-
-
-
-! call eos one more time with the converged value of the density
-
-      jlo_eos = jlo_save
-      jhi_eos = jhi_save
-
-      call helmeos
-
-      return
-      end
-
-
-      subroutine getEOSInversionPD( temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy, &
-         failtrig, togglecoulomb )
-
-      include 'implno.dek'
-      include 'starmod_vector_eos.dek'
-
-      double precision temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy
-      logical failtrig, togglecoulomb, togglecoulomb_two
-      common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) temp, energy, soundspeed, gammaout,entropy,failtrig
-
-      temp_row(1) = 1e7; den_row(1) = dens ; ptot_row(1) = pressure 
+! average atomic weight and charge
+      abar   = 1.0d0/sum(xmass(1:ionmax)/aion(1:ionmax))
+      zbar   = abar * sum(xmass(1:ionmax) * zion(1:ionmax)/aion(1:ionmax))
+
+! set the input vector. pipeline is only 1 element long
       abar_row(1) = abar ; zbar_row(1) = zbar
       jlo_eos = 1 ; jhi_eos = 1
 
-      togglecoulomb_two = togglecoulomb
+!INPUTS: dc = central density, twd = temperature of white dwarf, omega = angular velocity, dr = stepsize
 
-      call invert_helm_pd
-
-      temp = temp_row(1)
-      energy = etot_row(1)
-      soundspeed = cs_row(1)
-      gammaout = gam1_row(1)
-      entropy = stot_row(1)
-
-      failtrig = eosfail
-
-      if (eosinvertfail .eqv. .true.) then
-		failtrig = eosinvertfail
-      end if
-
-      return
+      if(command_argument_count().ge.1)then
+         call get_command_argument(1,string)
+         read(string,*)dc
+      else
+         dc = 1.d7
+      endif
+      if(command_argument_count().ge.2)then
+         call get_command_argument(2,string)
+         read(string,*)twd
+      else
+!Used to be twd = 1.d3
+         twd = 5.d6
+      endif
+      if(command_argument_count().ge.3)then
+         call get_command_argument(3,string)
+         read(string,*)omega
+      else
+         omega = 0.d0
+      endif
+      if(command_argument_count().ge.4)then
+         call get_command_argument(4,string)
+         read(string,*)dr
+      else
+         dr = 1.d6   
+      endif
+      temp_row(1) = twd
+      den_row(1) = dc
+      call helmeos
+!c print values for centre
+      print 9,0.,dc,0.,temp_row(1),stot_row(1)
+! make 2-nd order approximation for first step
+      x = dr !/1.d-2
+      y(1) = dc !-x**2/6.+n*x**4/120.
+      y(2) = 4*pi/3*x**3*dc !-x/3.+n*x**3/30.
+!
+! ... runge-kutta loop
+!
+! get derivatives (includes call to Helmholtz for current point)
+ 10   call wdderivs(x,y,dydx)
+! print current point
+      print 9,x,y(1),y(2),temp_row(1),stot_row(1)
+ 9    format(5(1x,1pe10.4))
+      ! make one step
+      call rk4(y,dydx,2,x,dr,ynew,wdderivs)
+! continue until density becomes negative
+      if(ynew(1).gt.0..and..not.eosfail)then
+         x = x+dr
+         y(1) = ynew(1)
+         y(2) = ynew(2)
+         goto 10
+      endif
+! estimate r for which density equals 0 by linear interpolation
+      dydx(1) = (ynew(1)-y(1))/dr
+      print 9,x+(0.-y(1))/dydx(1),0.,y(2),0.,0.
       end
-
-      subroutine invert_helm_pd
+!
+    subroutine wdderivs(x,y,dydx)
       include 'implno.dek'
-      include 'const.dek'
-      include 'starmod_vector_eos.dek'
-
-
-! given the pressure, temperature, and composition
-! find everything else
-
-! it is assumed that ptot_row(j), den_row(j), abar_row(j),
-! zbar_row(j), and the pipe limits (jlo_eos:jhi_eos), have
-! been set before calling this routine.
-
-! on input temp_row(j) conatins a guess for the temperature,
-! on output temp_row(j) contains the converged temperature.
-
-! To get the greatest speed advantage, the eos should be fed a
-! large pipe of data to work on.
-
-! this version is quiet on all errors
-
-
-! local variables
-      integer          i,j,jlo_save,jhi_save
-      double precision temp,f,df,tempnew,eostol,fpmin
-      parameter        (eostol = 1.0d-8, &
-                        fpmin  = 1.0d-14)
-
-
-! initialize
-      jlo_save = jlo_eos
-      jhi_save = jhi_eos
-      do j=jlo_eos, jhi_eos
-       eoswrk01(j) = 0.0d0
-       eoswrk02(j) = 0.0d0
-       eoswrk03(j) = ptot_row(j)
-       eoswrk04(j) = temp_row(j)
-      end do
-
-      eosinvertfail = .false.
-
-! do the first newton loop with all elements in the pipe
+      include 'vector_eos.dek'
+      logical first/.true./
+      double precision x,y(2),dydx(2),G,pi,dtd,dold
+      parameter(pi=3.141592653589793d0,G=6.67e-8)
+      double precision omega
+      logical isentropic
+      common/passon/omega,isentropic
+!      save first,dold
+!
+! For rotation, to first order we have
+! we have d P/dr  = -G M_r rho/r^2 + (2/3) Omega^2 r= d P/d rho * d rho/dr
+!         d Mr/dr = 4 pi r^2 rho 
+! Hence, to solve for y(1)=density and y(2)=enclosed mass
+!         d y(1)/dx = (d rho/d P) * (-G y(2)/x^2+(2/3) Omega^2 x)
+!         d y(2)/dx = 4 pi x^2 y(1)
+      den_row(1)  = y(1)
+      if(first)then
+         first = .false.
+      else
+         if(isentropic)then
+            dtd = -dsd_row(1)/dst_row(1)
+            temp_row(1) = max(1d3,temp_row(1)+dtd*(y(1)-dold))
+         endif
+      endif
+!      print*,x,y,den_row(1),temp_row(1)
       call helmeos
-
-      do j = jlo_eos, jhi_eos
-
-       f     = ptot_row(j)/eoswrk03(j) - 1.0d0
-       df    = dpt_row(j)/eoswrk03(j)
-       eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-       temp    = temp_row(j)
-       tempnew = min(max(0.5d0*temp,temp - eoswrk02(j)),2.0d0*temp)
-
-! compute the error
-       eoswrk01(j)  = abs((tempnew - temp)/temp)
-
-! store the new density, keep it within the table limits
-       temp_row(j)  = min(1.0d14,max(tempnew,1.0d-11))
-
-      enddo
-
-
-
-! now loop over each element of the pipe individually
-      do j = jlo_save, jhi_save
-
-       do i=2,40
-
-        if (eoswrk01(j) .lt. eostol .or. &
-            abs(eoswrk02(j)) .le. fpmin) goto 20
-
-        jlo_eos = j
-        jhi_eos = j
-
-        call helmeos
-
-        f     = ptot_row(j)/eoswrk03(j) - 1.0d0
-        df    = dpt_row(j)/eoswrk03(j)
-        eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-        temp    = temp_row(j)
-        tempnew = min(max(0.5d0*temp,temp - eoswrk02(j)),2.0d0*temp)
-
-! compute the error
-        eoswrk01(j)  = abs((tempnew - temp)/temp)
-
-! store the new temperature, keep it within the table limits
-        temp_row(j)  = min(1.0d14,max(tempnew,1.0d-11))
-
-! end of netwon loop
-       end do
-
-
-! we did not converge if we land here
-      write(6,*)
-      write(6,*) 'newton-raphson failed in routine invert_helm_pd'
-      write(6,*) 'pipeline element',j
- 01   format(1x,5(a,1pe16.8))
-      write(6,01) 'error =',eoswrk01(j), &
-                  '  eostol=',eostol,'  fpmin =',fpmin
-      write(6,01) 'temp   =',temp_row(j),'  temp_estimate=',eoswrk04(j)
-      write(6,01) 'f/df  =',eoswrk02(j),' f   =',f,    ' df    =',df
-      write(6,01) 'density = ',den_row(j)
-      write(6,01) 'pres  =',eoswrk03(j)
-      write(6,*)
-      eosinvertfail = .true.
-!      stop 'could not find a density in routine invert_helm_pd'
-
-! land here if newton loop converged, back for another pipe element
- 20    continue
-      end do
-
-! call eos one more time with the converged value of the density
-
-      jlo_eos = jlo_save
-      jhi_eos = jhi_save
-
-      call helmeos
-
-      return
+!      print 9,ptot_row(1),dpd_row(1),stot_row(1),dtd
+9     format(4(1x,1pe10.4))
+!
+      if(omega.le.0.d0)then
+         dydx(1) = -G*y(2)*y(1)/x**2/dpd_row(1)
+      else
+         dydx(1) = MIN(0.d0,(omega**2/1.5d0*x-G*y(2)/x**2)*y(1)/dpd_row(1))
+      endif
+      dydx(2) = 4*pi*x**2*y(1)
+!      print*,omega,dydx
+      dold = y(1)
       end
-
-
-
-      subroutine getEOSInversionSP_withest( temp, dens, abar, zbar, dens_est, temp_est, pressure, energy, &
-	soundspeed, gammaout, entropy, warninglabel, failtrig, togglecoulomb, eostol )
-
-      include 'implno.dek'
-      include 'starmod_vector_eos.dek'
-
-      double precision temp, dens, abar, zbar, pressure, energy, soundspeed, gammaout, entropy
-	  double precision eostol
-      double precision f, df, dens_est, temp_est
-      logical failtrig, togglecoulomb, togglecoulomb_two
-      common /togblock/ togglecoulomb_two	!Because togglecoulomb must be DUMMY
-!f2py intent(out) dens,temp,energy, soundspeed, gammaout,failtrig
-      double precision deltaTemp, newTemp, oldTemp
-      double precision fpmin
-      parameter (fpmin  = 1.0d-14)
-      integer j, MAXTRIES, numTries, nhit, warninglabel
-      parameter (MAXTRIES = 100)
-      double precision newdeltadens, olddeltadens, olddens
-
-      eosinvertfail = .false.
-
-      togglecoulomb_two = togglecoulomb
-
-      ! first guess a temperature and get correct pressure and density
-      jlo_eos = 1 ; jhi_eos = 1
-      
-      ptot_row(1)  = pressure ; abar_row(1) = abar ; zbar_row(1) = zbar; stot_row(1) = entropy
-
-      newTemp = temp_est ! initial guess for the temperature
-      den_row(1) = dens_est ! initial guess for the density
-
-      olddens = den_row(1)
-      oldTemp = 0e0
-      f = 1.0
-      df = 1.0
-
-      numTries = 0
-      olddeltadens = 1.d-10
-      nhit = 0
-
-!	  eostol = 1.0d-8
-
-!      write(*,*) entropy
-      do while( abs((newTemp - oldTemp)/newTemp) .gt. eostol .and. abs(f/df) .gt. fpmin .and. &
-			numTries .lt. MAXTRIES .and. (eosinvertfail .eqv. .false.))
-         temp_row(1) = newTemp
-         
-         call invert_helm_pt_withest(eostol)
-         
-         f     = stot_row(1)/entropy - 1.0d0
-         df    = dst_row(1)/entropy
-         
-         deltaTemp = f/df
-         oldTemp = newTemp
-!         write(*,*) numTries, den_row(1), temp_row(1), deltaTemp
-
-         newdeltadens = den_row(1) - olddens
-         if(abs(newdeltadens/olddeltadens + 1d0) .lt. 1e-6) then
-                 nhit = nhit + 1
-	         deltaTemp = 0.5**nhit*deltaTemp
-         end if
-         newTemp = min(max(0.5d0*newTemp,newTemp - deltaTemp),2.0d0*newTemp)
-!         write(*,*) deltaTemp, newTemp, oldTemp, den_row(1), f, df
-!         pause
-         numTries = numTries + 1
-         olddens = den_row(1)
-         olddeltadens = newdeltadens
-!		 write(*,*) numTries
-      end do
-
-	  if((eosinvertfail .eqv. .true.) .and. warninglabel .eq. 1) then
-		 write(*,*) "EOSInversionSP_withest ERROR within invert_helm_pt_quiet! "
-		 write(*,*) "numTries: ", numTries
-         write(*,*) "entropy: ", entropy, "press: ", pressure
-		 write(*,*) "T_current: ", newTemp, "T_prev: ", oldTemp
-		 write(*,*) "dens_current: ", den_row(1), "dens_prev: ", den_row(1) - newdeltadens
-		 write(*,*) "error = ", abs((newTemp - oldTemp)/newTemp)
-		 write(*,*) "eostol = ", eostol, '  fpmin =',fpmin
-		 write(*,*) "f/df  =", deltaTemp,' f   =',f,    ' df    =',df
-		 eosinvertfail = .true.
-	  else if((numTries .eq. MAXTRIES) .and. warninglabel .eq. 1) then
-		 write(*,*) "EOSInversionSP_withest ERROR! "
-		 write(*,*) "numTries: ", numTries
-         write(*,*) "entropy: ", entropy, "press: ", pressure
-		 write(*,*) "T_current: ", newTemp, "T_prev: ", oldTemp
-		 write(*,*) "dens_current: ", den_row(1), "dens_prev: ", den_row(1) - newdeltadens
-		 write(*,*) "error = ", abs((newTemp - oldTemp)/newTemp)
-		 write(*,*) "eostol = ", eostol, '  fpmin =',fpmin
-		 write(*,*) "f/df  =", deltaTemp,' f   =',f,    ' df    =',df
-		 eosinvertfail = .true.
-      end if
-      dens = den_row(1)
-      temp = temp_row(1)
-      soundspeed = cs_row(1)
-      gammaout = gam1_row(1)
-      energy = etot_row(1)
-
-      failtrig = eosfail
-
-      if (eosinvertfail .eqv. .true.) then
-		failtrig = eosinvertfail
-      end if
-
-      return
-      end
-
-!Only to be used with the SP-with initial dens/temp estimates routine
-      subroutine invert_helm_pt_withest( eostol )
-      include 'implno.dek'
-      include 'const.dek'
-      include 'starmod_vector_eos.dek'
-
-! given the pressure, temperature, and composition
-! find everything else
-
-! it is assumed that ptot_row(j), temp_row(j), abar_row(j),
-! zbar_row(j), and the pipe limits (jlo_eos:jhi_eos), have
-! been set before calling this routine.
-
-! on input den_row(j) conatins a guess for the density,
-! on output den_row(j) contains the converged density.
-
-! To get the greatest speed advantage, the eos should be fed a
-! large pipe of data to work on.
-
-! this version is quiet on all errors
-
-
-! local variables
-      integer          i,j,jlo_save,jhi_save
-      double precision den,f,df,dennew,eostol,fpmin
-!      parameter        (eostol = 1.0d-8, &
-!                        fpmin  = 1.0d-14)
-      parameter        (fpmin  = 1.0d-14)
-
-
-! initialize
-      jlo_save = jlo_eos
-      jhi_save = jhi_eos
-      do j=jlo_eos, jhi_eos
-       eoswrk01(j) = 0.0d0
-       eoswrk02(j) = 0.0d0
-       eoswrk03(j) = ptot_row(j)
-       eoswrk04(j) = den_row(j)
-      end do
-
-      eosinvertfail = .false.
-
-! do the first newton loop with all elements in the pipe
-      call helmeos
-
-      do j = jlo_eos, jhi_eos
-
-       f     = ptot_row(j)/eoswrk03(j) - 1.0d0
-       df    = dpd_row(j)/eoswrk03(j)
-       eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-       den    = den_row(j)
-       dennew = min(max(0.5d0*den,den - eoswrk02(j)),2.0d0*den)
-
-! compute the error
-       eoswrk01(j)  = abs((dennew - den)/den)
-
-! store the new density, keep it within the table limits
-       den_row(j)  = min(1.0d14,max(dennew,1.0d-11))
-
-      enddo
-
-
-
-! now loop over each element of the pipe individually
-      do j = jlo_save, jhi_save
-
-       do i=2,40
-
-        if (eoswrk01(j) .lt. eostol .or. &
-            abs(eoswrk02(j)) .le. fpmin) goto 20
-
-        jlo_eos = j
-        jhi_eos = j
-
-        call helmeos
-
-        f     = ptot_row(j)/eoswrk03(j) - 1.0d0
-        df    = dpd_row(j)/eoswrk03(j)
-        eoswrk02(j) = f/df
-
-! limit excursions to factor of two changes
-        den    = den_row(j)
-        dennew = min(max(0.5d0*den,den - eoswrk02(j)),2.0d0*den)
-
-! compute the error
-        eoswrk01(j)  = abs((dennew - den)/den)
-
-! store the new density, keep it within the table limits
-        den_row(j)  = min(1.0d14,max(dennew,1.0d-11))
-
-! end of netwon loop
-       end do
-
-
-! we did not converge if we land here
-      write(6,*)
-      write(6,*) 'newton-raphson failed in routine invert_helm_pt'
-      write(6,*) 'pipeline element',j
- 01   format(1x,5(a,1pe16.8))
-      write(6,01) 'error =',eoswrk01(j), &
-                  '  eostol=',eostol,'  fpmin =',fpmin
-      write(6,01) 'den   =',den_row(j),'  den_estimate=', eoswrk04(j)
-      write(6,01) 'f/df  =',eoswrk02(j),' f   =',f,    ' df    =',df
-      write(6,01) 'temp  =',temp_row(j)
-      write(6,01) 'pres  =',eoswrk03(j)
-      write(6,*)
-      eosinvertfail = .true.
-!      stop 'could not find a density in routine invert_helm_pt'
-
-
-
-! land here if newton loop converged, back for another pipe element
- 20    continue
-      end do
-
-
-
-! call eos one more time with the converged value of the density
-
-      jlo_eos = jlo_save
-      jhi_eos = jhi_save
-
-      call helmeos
-
-      return
-      end
-
-
 
 ! here is the tabular helmholtz free energy eos:
 !
@@ -1309,6 +148,35 @@
 ! routine helmeos3 uses fermionic ions
 ! routine helmeos2 adds third derivatives
 ! routine helmeos_orig as helmeos with the table read inside the routine
+
+      SUBROUTINE rk4(y,dydx,n,x,h,yout,derivs)
+      INTEGER n,NMAX
+      DOUBLE PRECISION h,x,dydx(n),y(n),yout(n)
+      EXTERNAL derivs
+      PARAMETER (NMAX=50)
+      INTEGER i
+      DOUBLE PRECISION h6,hh,xh,dym(NMAX),dyt(NMAX),yt(NMAX)
+      hh=h*0.5d0
+      h6=h/6.d0
+      xh=x+hh
+      do 11 i=1,n
+        yt(i)=y(i)+hh*dydx(i)
+11    continue
+      call derivs(xh,yt,dyt)
+      do 12 i=1,n
+        yt(i)=y(i)+hh*dyt(i)
+12    continue
+      call derivs(xh,yt,dym)
+      do 13 i=1,n
+        yt(i)=y(i)+h*dym(i)
+        dym(i)=dyt(i)+dym(i)
+13    continue
+      call derivs(x+h,yt,dyt)
+      do 14 i=1,n
+        yout(i)=y(i)+h6*(dydx(i)+dyt(i)+2.d0*dym(i))
+14    continue
+      return
+      END
 
 
 
@@ -1327,7 +195,7 @@
 
 ! open the file (use softlinks to input the desired table)
 
-       open(unit=19,file='/home/cczhu/GitHubTemp/czerny_wd/helm_table.dat',status='old')
+       open(unit=19,file='helm_table.dat',status='old')
 
 
 ! for standard table limits
@@ -1425,7 +293,7 @@
       subroutine helmeos
       include 'implno.dek'
       include 'const.dek'
-      include 'starmod_vector_eos.dek'
+      include 'vector_eos.dek'
       include 'helm_table_storage.dek'
 
 
@@ -1469,7 +337,7 @@
 
 
       double precision sioncon,forth,forpi,kergavo,ikavo,asoli3,light2
-      parameter        (sioncon = 2.0d0 * pi * amu * kerg/h/h, &
+      parameter        (sioncon = (2.0d0 * pi * amu * kerg)/(h*h), &
                         forth   = 4.0d0/3.0d0, &
                         forpi   = 4.0d0 * pi, &
                         kergavo = kerg * avo, &
@@ -1526,8 +394,6 @@
                         third =  1.0d0/3.0d0, &
                         esqu  =  qe * qe)
 
-      logical togglecoulomb_two
-      common /togblock/ togglecoulomb_two
 
 ! quintic hermite polynomial statement functions
 ! psi0 and its derivatives
@@ -1602,7 +468,6 @@
 04    format(1x,4(a,i4))
 
 
-!      write(*,*) 'in helmeos',den_row(1),etot_row(1),abar_row(1),zbar_row(1)
 
 ! start of pipeline loop, normal execution starts here
       eosfail = .false.
@@ -1612,7 +477,6 @@
 !       if (den_row(j)  .le. 0.0) stop 'den less than 0 in helmeos'
 
        temp  = temp_row(j)
-!       write(6,*) 'temp',temp
        den   = den_row(j)
        abar  = abar_row(j)
        zbar  = zbar_row(j)
@@ -1702,32 +566,33 @@
 ! enter the table with ye*den
         din = ye*den
 
+
 ! bomb proof the input
         if (temp .gt. t(jmax)) then
-         write(6,01) 'temp=',temp,' t(jmax)=',t(jmax)
-         write(6,*) 'temp too hot, off grid'
-         write(6,*) 'setting eosfail to true and returning'
+!         write(6,01) 'temp=',temp,' t(jmax)=',t(jmax)
+!         write(6,*) 'temp too hot, off grid'
+!         write(6,*) 'setting eosfail to true and returning'
          eosfail = .true.
          return
         end if
         if (temp .lt. t(1)) then
-         write(6,01) 'temp=',temp,' t(1)=',t(1)
-         write(6,*) 'temp too cold, off grid'
-         write(6,*) 'setting eosfail to true and returning'
+!         write(6,01) 'temp=',temp,' t(1)=',t(1)
+!         write(6,*) 'temp too cold, off grid'
+!         write(6,*) 'setting eosfail to true and returning'
          eosfail = .true.
          return
         end if
         if (din  .gt. d(imax)) then
-         write(6,01) 'den*ye=',din,' d(imax)=',d(imax)
-         write(6,*) 'ye*den too big, off grid'
-         write(6,*) 'setting eosfail to true and returning'
+!         write(6,01) 'den*ye=',din,' d(imax)=',d(imax)
+!         write(6,*) 'ye*den too big, off grid'
+!         write(6,*) 'setting eosfail to true and returning'
          eosfail = .true.
          return
         end if
         if (din  .lt. d(1)) then
-         write(6,01) 'ye*den=',din,' d(1)=',d(1)
-         write(6,*) 'ye*den too small (if ye*den<0, den<0!), off grid'
-         write(6,*) 'setting eosfail to true and returning'
+!         write(6,01) 'ye*den=',din,' d(1)=',d(1)
+!         write(6,*) 'ye*den too small, off grid'
+!         write(6,*) 'setting eosfail to true and returning'
          eosfail = .true.
          return
         end if
@@ -2155,25 +1020,6 @@
          dscouldz = 0.0d0
         end if
 
-!Hack that turns off coulomb corrections if user asks
-        if (.not. (togglecoulomb_two)) then
-         pcoul    = 0.0d0
-         dpcouldd = 0.0d0
-         dpcouldt = 0.0d0
-         dpcoulda = 0.0d0
-         dpcouldz = 0.0d0
-         ecoul    = 0.0d0
-         decouldd = 0.0d0
-         decouldt = 0.0d0
-         decoulda = 0.0d0
-         decouldz = 0.0d0
-         scoul    = 0.0d0
-         dscouldd = 0.0d0
-         dscouldt = 0.0d0
-         dscoulda = 0.0d0
-         dscouldz = 0.0d0
-        end if
-
 
 ! sum all the gas components
        pgas    = pion + pele + pcoul
@@ -2438,7 +1284,7 @@
 
       subroutine pretty_eos_out(whose)
       include 'implno.dek'
-      include 'starmod_vector_eos.dek'
+      include 'vector_eos.dek'
 
 ! writes a pretty output for the eos tester
 
