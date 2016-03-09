@@ -7,13 +7,18 @@ import copy as cp
 import magprofile_mass as magprof
 import myhelm_magstar as myhmag
 import rhoTcontours as rtc
+#from StarModCore import maghydrostar
 
 
-class maghydrostar_core():
+class maghydrostar:
 	"""
-	Hydrostatic star generator core functionality, containing shooters, equation
-	of state functions and common post-processing functions.  Parent class of 
-	maghydrostar and mhs_steve; see child class documentation for more details.
+	Magnetohydrostatic star generator.  Generates spherical WDs with 
+	adiabatic temperature profiles using the Helmholtz 
+	(http://cococubed.asu.edu/code_pages/eos.shtml) EOS, rigid rotation 
+	spherical approximation and Gough & Tayler 66 magnetic convective 
+	suppression criterion (but no pressure term).  Includes gravitational 
+	and varying specific heat ratio terms of GT66 criterion.  All values 
+	in CGS.
 
 	Parameters
 	----------
@@ -81,45 +86,124 @@ class maghydrostar_core():
 		If star was integrated and data written, results can be found in
 		mystar.data.  Further analysis can be performed with 
 		mystar.getenergies,	mystar.getgradients and mystar.getconvection.
+
+
+	Notes
+	-----
+	Additional documentation can be found for specific functions within the
+	class.  The default behaviour of maghydrostar is to shoot for either a 
+	user-specified mass or both a mass and an angular momentum.  It is possible
+	to define an instance of maghydrostar and then use integrate_star to
+	produce profiles of a known density, central temperature/entropy, and
+	spin angular velocity Omega.  Be warned, however, that many of the 
+	integration parameters, including the value of the temperature floor, the
+	types of superadiabatic temperature gradient deviations used, and the 
+	pressure and density at which to halt integration.  MAKE SURE these are set 
+	when the class instance is declared!  See Examples, below.		
+
+
+	Examples
+	--------
+	To build a 1.2 Msun star with solid body rotation Omega = 0.3 s^-1:
+	>>> import StarMod as Star
+	>>> mystar = Star.maghydrostar(1.2*1.9891e33, 5e6, False, 
+	>>>		omega=0.3, simd_userot=True, verbose=True)
+	The stellar profile can be found under mystar.data, and plotted.  
+	For exmaple:
+	>>> import matplotlib.pyplot as plt
+	>>> plt.plot(mystar.data["R"], mystar.data["rho"], 'r-')
+	>>> plt.xlabel("r (cm)")
+	>>> plt.ylabel(r"$\rho$ (g/cm$^3$)")
+	To generate a series of adiabatic non-rotating WD profiles with 
+	increasing density, we can use maghydrostar's methods:
+	>>> import StarMod as Star
+	>>> import numpy as np
+	>>> import copy
+	>>> dens_c = 10.**np.arange(8,9,0.1)
+	>>> out_dict = {"dens_c": dens_c,
+	>>>     "M": np.zeros(len(dens_c)),
+	>>>     "stars": []}
+	>>> mystar = Star.maghydrostar(False, False, False, simd_userot=True, 
+	>>>				verbose=True, stop_mrat=False, dontintegrate=True)
+	>>> for i in range(len(dens_c)):
+	>>>     [Mtot, outerr_code] = mystar.integrate_star(dens_c[i], 5e6, 0.0, 
+	>>>					recordstar=True, outputerr=True)
+	>>>     out_dict["M"][i] = Mtot
+	>>>     out_dict["stars"].append(cp.deepcopy(mystar.data))
 	"""
 
 	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
-				mintemp=1e5, composition="CO", togglecoulomb=True,
-				P_end_ratio=1e-8, fakeouterpoint=False, stop_invertererr=True, 
+				S_want=False, mintemp=1e5, composition="CO", togglecoulomb=True,
+				simd_userot=True, simd_usegammavar=False, simd_usegrav=False, 
+				simd_suppress=False, nablarat_crit=False, P_end_ratio=1e-8, 
+				ps_eostol=1e-8, fakeouterpoint=False, stop_invertererr=True, 
 				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
-				mass_tol=1e-6, L_tol=1e-6, omega_crit_tol=1e-3, nreps=30, 
-				stopcount_max=5, verbose=True):
+				densest=False, omegaest=False, mass_tol=1e-6, L_tol=1e-6, 
+				omega_crit_tol=1e-3, nreps=30, stopcount_max=5, 
+				dontintegrate=False, verbose=True):
 
-		# Constants
 		self.Msun = 1.9891e33
 		self.grav = 6.67384e-8
-
-		# Stellar properties
-		self.mass_want = mass
-		self.temp_c = temp_c
-		self.L_want = Lwant
-
-		# Integration settings
 		self.stepcoeff = 1e-2
+		self.mass_want = mass
+		self.mass_tol = mass_tol
+		self.temp_c = temp_c
 		self.nreps = nreps
+		self.nablarat_crit = nablarat_crit
+
+		# recent additions to __init__ (formerly were just passed to getstarmodel).
 		self.fakeouterpoint = fakeouterpoint
 		self.stop_invertererr = stop_invertererr
 		self.stop_mrat = stop_mrat
 		self.stop_positivepgrad = stop_positivepgrad
 		self.stop_mindenserr = stop_mindenserr
-		self.s_mind_errcode = False				# If True, returns mindenserr as an outerr_code (usually unwanted behaviour)
+		self.s_mind_errcode = False	# If True, returns mindenserr as an outerr_code (usually unwanted behaviour)
 		self.stopcount_max = stopcount_max
-
-		# Integration tolerances
-		self.mass_tol = mass_tol
 		self.omega_crit_tol = omega_crit_tol
+		self.L_want = Lwant
 		self.L_tol = L_tol
+
+		self.togglecoulomb = togglecoulomb
 
 		# Remember to print messages
 		self.verbose = verbose
 
-		# EOS settings
-		self.togglecoulomb = togglecoulomb
+		# If magprofile is false, generate a zero-field profile
+		if not magprofile:
+			if self.verbose:
+				print "magprofile == False - will assume star has no magnetic field!"
+			self.magf = magprof.magprofile(None, None, None, None, blankfunc=True)
+		else:
+			self.magf = magprofile
+
+		self.mintemp = mintemp
+		self.mintemp_reltol = 1e-6
+		if self.verbose:
+			print "Minimum temperature set to {0:.3e}".format(self.mintemp)
+
+		self.simd_userot = simd_userot
+		self.simd_usegammavar = simd_usegammavar
+		self.simd_usegrav = simd_usegrav
+		self.simd_suppress = simd_suppress
+
+		if self.simd_usegammavar and self.verbose:
+			print "VARIABLE GAMMA TERM included in nabla deviation!"
+		if self.simd_usegrav and self.verbose:
+			print "GRAVITY TERM included in nabla deviation!"
+		if self.simd_userot and self.verbose:
+			print "ROTATION TERM included in nabla deviation!"
+		if self.simd_suppress and self.verbose:
+			print "WARNING - YOU'LL BE SUPPRESSING nabla DEVIATIONS IN THE FIRST MASS STEP!  I HOPE YOU HAVE A GOOD REASON!"
+
+		if omega < 0.:
+			if self.verbose:
+				print "Omega < 0 - max rotation estimator selected!"
+			self.omega = 0.
+		else:
+			if self.verbose:
+				print "Omega = {0:.3e}".format(omega)
+			self.omega = max(0., omega)
+
 		if composition == "He":
 			if self.verbose:
 				print "Composition set to HELIUM"
@@ -134,58 +218,42 @@ class maghydrostar_core():
 			self.abar = 13.714285714285715
 		self.zbar = self.abar/2.	# Will need changing when we start looking at weirder stars.
 
+		# In the future, adapt other EOSs?
+
 		# Run a dummy gethelmeos to check if EOS is initialized:
 		pressure,energy,soundspeed,gammaout,entropy,checkeosfailure = myhmag.gethelmholtzeos(1e5,1e2,2.,4.,True)
 		if checkeosfailure:					# If 1 is returned...
 			print "I noticed you haven't initialized helmholtz.  Doing so now."
 			myhmag.initializehelmholtz()	# ...initialize helmholtz
 
-		# Magnetic profile
-		if not magprofile:	# If magprofile is false, generate a zero-field profile
-			if self.verbose:
-				print "magprofile == False - will assume star has no magnetic field!"
-			self.magf = magprof.magprofile(None, None, None, None, blankfunc=True)
-		elif (type(magprofile) == float or type(magprofile) == np.float64):		# If magprofile is constant nabladev = delta = B^2/(B^2 + 4pi*Gamma1*Pgas)
+		# Check if magnetic field should be back-calculated or obtained from spline
+		if type(magprofile) == float or type(magprofile) == np.float64:
 			self.nabladev = magprofile
 			if self.nabladev <= 0.:
 				raise AssertionError("ERROR: if you use a constant delta field, then magprofile must be a positive value!")
 			if self.verbose:
 				print "Derivative WITH CONSTANT DEVIATION RATIO {0:.3e} selected! Using self.nabladev as deviation delta(r) (MM09 Eqn. 4).".format(self.nabladev)
-			self.magf = False
 		else:
-			self.magf = magprofile
 			self.nabladev = False
+		# derivatives_gtsh now handles both constant deviation and user-defined magnetic profile.
+		self.derivatives = self.derivatives_gtsh
+		self.first_deriv = self.first_derivatives_gtsh
 
-		# Temperature floor
-		self.mintemp = mintemp
-		self.mintemp_reltol = 1e-6
-		if self.verbose:
-			print "Minimum temperature set to {0:.3e}".format(self.mintemp)
-
-		# Omega input options
-		if omega < 0.:
-			if self.verbose:
-				print "Omega < 0 - max rotation estimator selected!"
-			self.omega = omega
-		else:
-			if self.verbose:
-				print "Omega = {0:.3e}".format(omega)
-			self.omega = max(0., omega)
-
-		# Initialze data storage dict
 		self.data = {}
+		if dontintegrate:
+			if self.verbose:
+				print "WARNING: integration disabled within maghydrostar!"
+		else:
+			if omega < 0.:
+				self.getmaxomega(P_end_ratio=P_end_ratio, densest=densest, S_want=S_want, ps_eostol=ps_eostol)
+			else:
+				if Lwant:
+					self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, damp_nrstep=0.25)
+				else:
+					self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
 
 
 ######################################### SHOOTING ALGORITHMS #########################################
-
-############################## GENERIC STUFF ###############################
-
-	def getcritrot(self, M, R):
-		"""Returns critical Omega given M and R.
-		"""
-		return np.sqrt(M*self.grav/R**3)
-
-############################## 1D MASS SHOOTER ###############################
 
 	def getstarmodel(self, densest=False, omega_user=-1, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, deltastepcoeff=0.1, out_search=False):
 		"""
@@ -311,27 +379,7 @@ class maghydrostar_core():
 		[Mtot_drho, outerr_code] = self.integrate_star(densest + drho, temp_c, omega, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, outputerr=True)
 		return [(Mtot_drho - Mtot)/drho, outerr_code]
 
-
-	@staticmethod
-	def chk_global_extrema(M_arr, dens_arr, Mwant):
-		"""Checks the central density to mass relationship to make sure the mass and temp_c/S_want combination can be reached.
-		"""
-
-		Mdiff = M_arr[-1] - Mwant
-		if Mdiff < 0 and max(M_arr) < Mwant:	# If the current star is too light, and we've never made a heavy enough star
-			# If the global maximum isn't the most recent integration, and we're currently going toward lighter stars
-			if (np.argmax(M_arr) - len(M_arr) < 1) and M_arr[-1] < M_arr[-2]:
-				return "Global maximum {0:.4e} mass is still too small to satisfy Mwant {1:.4e}".format(max(M_arr), Mwant)
-		elif Mdiff > 0 and min(M_arr) > Mwant:	# If the current star is too heavy, and we've never made a light enough star
-			if (np.argmin(M_arr) - len(M_arr) < 1) and M_arr[-1] > M_arr[-2]:
-			# If the global minimum isn't the most recent integration, and we're currently going toward heavier stars
-				return "Global minimum {0:.4e} mass is still too large to satisfy Mwant {1:.4e}".format(min(M_arr), Mwant)
-		else:
-			return None
-
-
-############## NESTED 1D JACOBIAN MASS/ANG MO SHOOTER (SLOWER) ##################
-
+############################# NESTED 1D JACOBIAN (SLOWER) #################################
 
 #	def getrotatingstarmodel(self, densest=False, omegaest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, damp_nrstep=1, deltastepcoeff=0.05, 
 #									interior_dscoeff=0.1, omega_warn=10., out_search=False):
@@ -438,9 +486,9 @@ class maghydrostar_core():
 #		Ltot_domega = self.getmomentofinertia(self.data["R"], self.data["rho"])[-1]*omega_alt
 #		return [(Ltot_domega - Ltot)/domega, outerr_code]
 
+###################################################################################################
 
-############### 2D JACOBIAN MASS/ANG MO SHOOTER (FASTER, MORE DANGEROUS) ####################
-
+############################# 2D JACOBIAN (FASTER, MORE DANGEROUS) #################################
 
 	def getrotatingstarmodel_2d(self, densest=False, omegaest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, damp_nrstep=1, deltastepcoeff=0.05, 
 									omega_warn=10., out_search=False):
@@ -585,9 +633,9 @@ class maghydrostar_core():
 		J_line2 = [(Ltot_drho - Ltot)/dvals[0], (Ltot_domega - Ltot)/dvals[1]]
 		return [np.array([J_line1, J_line2]), outerr_code]
 
+###################################################################################################
 
-################ OVERLOOP OF GETSTARMODEL FOR OBTAINING CRITICAL OMEGA ####################
-
+############################# OVERLOOP FOR OBTAINING CRITICAL OMEGA #################################
 
 	def getmaxomega(self, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, out_search=False):
 		"""
@@ -644,9 +692,9 @@ class maghydrostar_core():
 		if i == self.nreps:
 			print "WARNING, maximum number of shooting attempts {0:d} reached!".format(i)
 
+###################################################################################################
 
-################# OVERLOOP OF GETSTARMODEL FOR OBTAINING MAGNETIC FIELD CONFIGS ##############
-
+############################# OVERLOOP FOR OBTAINING MAGNETIC FIELD CONFIGS #################################
 
 	def getBcnabladevmodel(self, Bc_want, nabladev_est=0.001, Bc_tol=1e-4, mass_user=False, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, deltastepcoeff=0.1, out_search=False):
 		"""
@@ -837,9 +885,35 @@ class maghydrostar_core():
 		self.nabladev -= ddev
 		return [(EBratn - EBrat)/ddev, outerr_code]
 
+###################################################################################################
+
+############################# MISC #################################
+
+	@staticmethod
+	def chk_global_extrema(M_arr, dens_arr, Mwant):
+		"""Checks the central density to mass relationship to make sure the mass and temp_c/S_want combination can be reached.
+		"""
+
+		Mdiff = M_arr[-1] - Mwant
+		if Mdiff < 0 and max(M_arr) < Mwant:	# If the current star is too light, and we've never made a heavy enough star
+			# If the global maximum isn't the most recent integration, and we're currently going toward lighter stars
+			if (np.argmax(M_arr) - len(M_arr) < 1) and M_arr[-1] < M_arr[-2]:
+				return "Global maximum {0:.4e} mass is still too small to satisfy Mwant {1:.4e}".format(max(M_arr), Mwant)
+		elif Mdiff > 0 and min(M_arr) > Mwant:	# If the current star is too heavy, and we've never made a light enough star
+			if (np.argmin(M_arr) - len(M_arr) < 1) and M_arr[-1] > M_arr[-2]:
+			# If the global minimum isn't the most recent integration, and we're currently going toward heavier stars
+				return "Global minimum {0:.4e} mass is still too large to satisfy Mwant {1:.4e}".format(min(M_arr), Mwant)
+		else:
+			return None
+
+
+	def getcritrot(self, M, R):
+		"""Returns critical Omega given M and R.
+		"""
+		return np.sqrt(M*self.grav/R**3)
+
 
 ###################################### EOS STUFF #######################################
-
 
 	# EOS functions are passed failtrig as a list (since lists are mutable).
 	def getpress_rhoT(self, dens, temp, failtrig=[-100]):
@@ -898,6 +972,368 @@ class maghydrostar_core():
 		if dummyfail1 or dummyfail2:
 			failtrig[0] = 1
 		return [e_int, e_deg, c_s]
+
+
+######################################## DERIVATIVES #######################################
+
+
+	def derivatives_gtsh(self, y, mass, omega, failtrig=[-100], ps_eostol=1e-8, m_step=1e29, isotherm=False, grad_full=False):
+		"""
+		Derivative that uses the "simple" Gough & Tayler 1966 formulation for magnetic suppression of convection in addition to the Solberg-Hoiland criterion for convective stability in a rotating medium.  
+		"""
+		R = y[0]
+		press = y[1]
+		temp = y[2]
+
+		[dens, entropy] = self.getdens_PT(press, temp, failtrig=failtrig)
+
+		# Take mag pressure Pchi = 0 for calculating hydro coefficients
+		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s] = self.geteosgradients(dens, temp, 0., failtrig=failtrig)
+
+		dydx = np.zeros(3)
+		dydx[0] = 1./(4.*np.pi*R**2.*dens)
+		dydx[1] = -self.grav*mass/(4.*np.pi*R**4.) + 1./(6.*np.pi)*omega**2/R	# -Pchi_grad*dydx[0]
+
+		# Obtain magnetic field
+		if self.nabladev:
+			Bfld = np.sqrt(4.*np.pi*Gamma1*press*self.nabladev/(1. - self.nabladev))
+		else:
+			Bfld = self.magf.fBfld(R, mass)
+		Pchi = (1./8./np.pi)*Bfld**2
+
+		nabla_terms = {}
+
+		if isotherm:
+
+			hydrograd = 0.		# Zero out hydrograd and deviation; totalgrad then will equal 0.
+			deviation = 0.
+
+			if self.simd_usegammavar:	# Populate deviations as zero
+				nabla_terms["dlngamdlnP"] = 0.
+				nabla_terms["nd_gamma"] = 0.
+			if self.simd_usegrav:
+				nabla_terms["dlngdlnP"] = 0.
+				nabla_terms["nd_grav"] = 0.
+			if self.simd_userot:
+				nabla_terms["nd_rot"] = 0.
+
+		else:
+
+			# GT66 magnetic deviation
+			deviation = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press)
+
+			# Magnetic gamma and gravitational terms from GT 66 Eqn. 3.19.
+			if self.simd_usegammavar:
+				press_est = press + dydx[1]*m_step
+				[dens_dummy, temp_dummy, Gamma1_est] = self.getdens_PS_est(press_est, entropy, failtrig=failtrig, dens_est=dens, temp_est=temp, eostol=ps_eostol)	# assumes adiabatic
+				nabla_terms["dlngamdlnP"] = (press/Gamma1)*(Gamma1_est - Gamma1)/(press_est - press)	# dlngamma/dlnP = (P/gamma)*(dgamma/dP)
+				nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press)*nabla_terms["dlngamdlnP"]
+				deviation += nabla_terms["nd_gamma"]
+			if self.simd_usegrav:
+				GH_Poverg = min(press*R**4/(dens*self.grav*mass**2), 1./dens)		# GH_P/g
+				nabla_terms["dlngdlnP"] = -GH_Poverg*(4.*np.pi*dens - 2.*mass/R**3)							# Second term technically becomes NaN, but this function will never see R = 0 or mass = 0
+				nabla_terms["nd_grav"] = 1./delta*Bfld**2/(4.*np.pi*Gamma1*press)*nabla_terms["dlngdlnP"]
+				deviation -= nabla_terms["nd_grav"]
+
+			# rotational term
+			if self.simd_userot:
+				H_Poverg = min(press*R**4/(dens*self.grav**2*mass**2), 1./(self.grav*dens))		# H_P/g
+				nabla_terms["nd_rot"] = 4.*(2./3.)**0.5*H_Poverg*omega**2/delta
+				deviation += nabla_terms["nd_rot"]
+
+		if self.nablarat_crit and (abs(deviation)/hydrograd > self.nablarat_crit):
+			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
+
+		totalgrad = hydrograd + deviation
+		dydx[2] = temp/press*totalgrad*dydx[1]
+
+		if grad_full:
+			return [dydx, Bfld, Pchi, hydrograd, totalgrad, nabla_terms]
+		else:
+			return dydx
+
+
+	def first_derivatives_gtsh(self, dens, M, Pc, Tc, omega, failtrig=[-100]):
+		"""First step to take for self.derivatives_gtsh()
+		"""
+
+		R = (3.*M/(4.*np.pi*dens))**(1./3.)
+		moddens = 4./3.*np.pi*dens
+		P = Pc - (3.*self.grav/(8.*np.pi)*moddens**(4./3.) - 0.25/np.pi*omega**2*moddens**(1./3.))*M**(2./3.)	# This is integrated out assuming constant density and magnetic field strength
+
+		[adgradred_dumm, hydrograd, nu_dumm, alpha_dumm, delta, Gamma1, cP_dumm, cPhydro_dumm, c_s_dumm] = self.geteosgradients(dens, Tc, 0.)	# Central rho, T, and current magnetic pressure since dP/dr = 0 for first step.  Now uses Pchi = 0.
+
+		# Obtain magnetic field
+		if self.nabladev:
+			Bfld = np.sqrt(4.*np.pi*Gamma1*Pc*self.nabladev/(1. - self.nabladev))
+		else:
+			Bfld = self.magf.fBfld(R, M)
+		Pchi = (1./8./np.pi)*Bfld**2
+
+		# GT66 Magnetic deviation
+		deviation = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*P)
+
+		nabla_terms = {}
+		# magnetic field gamma and gravitational terms
+		if self.simd_usegammavar:
+			if Tc > self.mintemp and not self.simd_suppress:
+				Gamma1_est = self.getgamma_PD(dens, P, failtrig=failtrig)
+				nabla_terms["dlngamdlnP"] = (Pc/Gamma1)*(Gamma1_est - Gamma1)/(P - Pc)		# dlngamma/dlnP = (P/gamma)*(dgamma/dP)
+				nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*Pc)*nabla_terms["dlngamdlnP"]
+				deviation += nabla_terms["nd_gamma"]
+			else:
+				nabla_terms["dlngamdlnP"] = 0.
+				nabla_terms["nd_gamma"] = 0.
+		if self.simd_usegrav:
+			if Tc > self.mintemp and not self.simd_suppress:
+				nabla_terms["dlngdlnP"] = -4.*np.pi/3.	# Comes from assuming H_P/g = 1/(G*rho)
+				nabla_terms["nd_grav"] = 1./delta*Bfld**2/(4.*np.pi*Gamma1*Pc)*nabla_terms["dlngdlnP"]
+				deviation -= nabla_terms["nd_grav"]
+			else:
+				nabla_terms["dlngdlnP"] = 0.
+				nabla_terms["nd_grav"] = 0.
+
+		# rotational term
+		if self.simd_userot:
+			if Tc > self.mintemp and not self.simd_suppress:
+				nabla_terms["nd_rot"] = 4.*(2./3.)**0.5/(self.grav*dens)*omega**2/delta
+				deviation += nabla_terms["nd_rot"]
+			else:
+				nabla_terms["nd_rot"] = 0.
+
+		if self.nablarat_crit and (abs(deviation)/hydrograd > self.nablarat_crit):
+			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
+
+		totalgrad = hydrograd + deviation	# Assume magnetic gradient is the same at R = 0 as is here
+		temp = Tc + Tc/Pc*totalgrad*(P - Pc)		
+
+		# If we hit the temperature floor, artificially force temp to remain at it, and set integration to isothermal
+		if temp <= self.mintemp:
+			temp = self.mintemp
+			isotherm = True
+		else:
+			isotherm = False
+
+		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms, isotherm]
+
+
+############################################# INTEGRATOR ###############################################
+
+
+	def integrate_star(self, dens_c, temp_c, omega, recordstar=False, P_end_ratio=1e-8, ps_eostol=1e-8, outputerr=False):
+		"""
+		ODE solver that generates stellar profile given a central density dens_c, central 
+		temperature temp_c, and solid-body angular speed omega.  All arguments not listed 
+		below are same as in __init__().
+
+		Parameters
+		----------
+		dens_c : central density (g/cm^3)
+		temp_c : central temperature (K)
+		omega : solid-body angular speed (rad/s)
+		outputerr : output any error codes received from integrator
+		"""
+
+		# If we use self.nabladev make sure it isn't negative
+		if self.nabladev:
+			assert self.nabladev > 0.
+
+		stepsize = max(self.mass_want,0.4*self.Msun)*0.01*min(self.mass_tol, 1e-6)	# Found out the hard way that if you use simd_usegammavar, having a large mass_tol can cause errors
+
+#		if ps_eostol > 1e-8:
+#			print "WARNING: ps_eostol is now {0:.3e}".format(ps_eostol)
+
+		outerr_code = False		# Integrator error code (see loop)
+
+		# Print out the M = 0 step
+		M = 0
+		R = 0
+		temp = temp_c
+		dens = dens_c
+		[Pc, entropy] = self.getpress_rhoT(dens, temp)		# P IS THE **GAS** PRESSURE, NOT THE TOTAL PRESSURE!
+		Pend = Pc*P_end_ratio
+		if recordstar:	# Auto-clears any previous data dict
+			self.data = {"M": [M],
+			"R": [R],
+			"Pgas": [Pc],
+			"rho": [dens],
+			"T": [temp],
+			"Sgas": [entropy],
+			"Pmag": [],	# Pmag, B will be populated in the next step (done in case B(r = 0) = infty)
+			"B": [],
+			"nabla_hydro": [],
+			"nabla_mhdr": [],
+			"nabla_terms": []}
+
+		errtrig = [0]		# Errortrig to stop integrator when Helmholtz NR-method fails to properly invert the EOS (usually due to errors slightly beyond tolerance)
+
+		# Take one step forward (we know the central values, and we assume dP_chi/dr = 0), assuming the central density does not change significantly
+		# first_deriv also returns the starting value of isotherm
+		M = stepsize
+		R, P, temp, Bfld, Pmag, hydrograd, totalgrad, nabla_terms, isotherm = self.first_deriv(dens, M, Pc, temp, omega, failtrig=errtrig)
+		[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
+
+		# If the inversion (will only be used if simd_usegammavar is active) in very first step fails, throw up an error and quit
+		if errtrig[0]:
+			outerr_code = "firststep_inverter_err"
+			if outputerr:
+				return [M, outerr_code]
+			else:
+				return M
+
+		if recordstar:
+			self.data["M"].append(M)
+			self.data["R"].append(R)
+			self.data["Pgas"].append(P)
+			self.data["rho"].append(dens)
+			self.data["T"].append(temp)
+			self.data["Sgas"].append(entropy)
+			self.data["Pmag"].append(Pmag)
+			self.data["B"].append(Bfld)
+			self.data["nabla_hydro"].append(hydrograd)
+			self.data["nabla_mhdr"].append(totalgrad)
+			self.data["nabla_terms"].append(nabla_terms)
+
+		# Continue stepping using scipy.integrate.odeint
+		while P > Pend:
+
+			# Adaptive stepsize
+			y_in = np.array([R, P, temp])
+			# The only way to "self-consistently" print out B is in the derivative, where it could be modified to force B^2/Pgas to be below some critical value
+			[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
+			stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-35)))
+
+			if recordstar:
+				self.data["Pmag"].append(Pmag)
+				self.data["B"].append(Bfld)
+				self.data["nabla_hydro"].append(hydrograd)
+				self.data["nabla_mhdr"].append(totalgrad)
+				self.data["nabla_terms"].append(nabla_terms)
+
+			R, P, temp = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), 
+												args=(omega, errtrig, ps_eostol, stepsize, isotherm), h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
+
+			if temp <= self.mintemp and not isotherm:
+				R, P, temp, M = self.connect_isotherm(y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, isotherm)
+				isotherm = True
+			else:
+				M += stepsize
+
+			[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
+
+			if recordstar:
+				self.data["M"].append(M)
+				self.data["R"].append(R)
+				self.data["Pgas"].append(P)
+				self.data["rho"].append(dens)
+				self.data["T"].append(temp)
+				self.data["Sgas"].append(entropy)
+
+			# Check errors
+			if self.stop_invertererr and errtrig[0]:
+				outerr_code = "inverter_err"
+				print "helmeos or inverter error!  Writing last data-point and stopping integration."
+				break
+			if P < 0:
+				outerr_code = "negativep_err"
+				print "P < 0!  Writing last data-point and stopping integration."
+				break
+			if self.stop_positivepgrad and dy[1] > 0:
+				outerr_code = "positivegrad_err"
+				print "dP/dR > 0!  Writing last data-point and stopping integration."
+				break
+			if self.stop_mrat and (M > self.stop_mrat*self.mass_want):
+				outerr_code = "hugemass_err"
+				print "M is huge!"
+				break
+			if self.stop_mindenserr and (abs(dens) < self.stop_mindenserr):
+				if self.s_mind_errcode:
+					outerr_code = "mindens_err"
+				print "Density is below {0:e}!  Writing last data-point and stopping integration.".format(self.stop_mindenserr)
+				break
+
+
+		# Step outward one last time
+		y_in = np.array([R, P, temp])
+		[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
+
+		# Generate a fake data point where M is exactly mass_want.  Useful for setting initial conditions for 3D WD simulations.
+		if recordstar:
+			self.data["Pmag"].append(Pmag)
+			self.data["B"].append(Bfld)
+			self.data["nabla_hydro"].append(hydrograd)
+			self.data["nabla_mhdr"].append(totalgrad) 
+			self.data["nabla_terms"].append(nabla_terms) 
+
+			if self.fakeouterpoint:
+				stepsize = self.stepcoeff*min(abs(y_in/(dy+1e-30)))
+				y_out = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), args=(omega, errtrig, ps_eostol, stepsize, isotherm), h0=stepsize*0.01, hmax = stepsize)[1,:]
+
+				self.data["M"].append(max(self.mass_want, M+stepsize))
+				self.data["R"].append(y_out[0])
+				self.data["Pgas"].append(0.)
+				self.data["rho"].append(0.)
+				self.data["T"].append(0.)
+				self.data["Sgas"].append(0.)
+				y_in = y_out	# Gradients one last time
+				[dy, Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, M, omega, ps_eostol=ps_eostol, m_step=stepsize, isotherm=isotherm, grad_full=True)
+				self.data["Pmag"].append(Pmag)
+				self.data["B"].append(Bfld)
+				self.data["nabla_hydro"].append(hydrograd)
+				self.data["nabla_mhdr"].append(totalgrad)
+				self.data["nabla_terms"].append(nabla_terms)
+
+			self.unpack_nabla_terms()
+			for item in self.data.keys():
+				self.data[item] = np.array(self.data[item])
+
+		if outputerr:
+			return [M, outerr_code]
+		else:
+			return M
+
+	def connect_isotherm(self, y_in, M, stepsize, omega, Pend, errtrig, ps_eostol, isotherm, iter_max=1000, subtol=1e-8):
+		"""
+		Loop to achieve self.mintemp within tolerance self.mintemp_reltol
+		"""
+		substep = 0.1*stepsize			# we'll use constant stepsizes
+		ys_in = np.array(y_in)			# arrays are passed by reference, not by value!
+		P = ys_in[1]
+		sM = M
+		i = 0
+		while i < iter_max and P > Pend and abs(substep) > subtol*stepsize:			# Integrate forward toward self.mintemp
+			R, P, temp = scipyinteg.odeint(self.derivatives, ys_in, np.array([sM,sM+substep]), 
+												args=(omega, errtrig, ps_eostol, substep, isotherm), h0=substep*0.01, hmax = substep, mxstep=1000)[1,:]
+			sM += substep
+
+			#print R, P, temp, sM, substep/stepsize
+
+			# If we're within the temperature tolerance
+			if abs(temp - self.mintemp)/self.mintemp < self.mintemp_reltol:
+#				if self.verbose:
+#					print ">>>Isotherm: current M = {2:.6e}, temp = {0:.6e}, deviation {1:.6e} from self.mintemp. Switching to isothermal.".format(temp, abs(temp - self.mintemp)/self.mintemp, sM)
+				break
+
+			# If we've overshot
+			if temp < self.mintemp:
+				R, P, temp = np.array(ys_in)	# reset R, P, temp to start of step
+				sM -= substep					# reverse mass step
+				substep = 0.1*substep			# repeat last integration step with greater accuracy
+
+			# If we've done neither, set up next integration
+			ys_in = np.array([R, P, temp])
+				
+		return [R, P, temp, sM]
+
+
+	def unpack_nabla_terms(self):
+		len_nabla = len(self.data["nabla_terms"])
+		for item in self.data["nabla_terms"][0].keys():
+			self.data[item] = np.zeros(len_nabla)
+		for i in range(len_nabla):
+			for item in self.data["nabla_terms"][0].keys():
+				self.data[item][i] = self.data["nabla_terms"][i][item]
+		del self.data["nabla_terms"]	#delete nabla_terms to remove duplicate copies
 
 
 ########################################### POSTPROCESSING FUNCTIONS #############################################
@@ -962,6 +1398,77 @@ class maghydrostar_core():
 		self.data["EB"] = 0.5*scipyinteg.cumtrapz(self.data["B"]**2*self.data["R"]**2, x=self.data["R"], initial=0.)
 
 
+	def getgradients(self):
+		"""Obtains magnetohydrostatic gradients for diagnosing stellar structures.  Requires a profile to have already been made (but can be run on partially complete sets).
+		"""
+
+		len_arr = len(self.data["rho"])
+		self.data["dy"] = np.zeros([len_arr,3])
+		self.data["B_natural"] = np.zeros(len_arr)
+		self.data["Pmag_natural"] = np.zeros(len_arr)
+		self.data["nabla_ad"] = np.zeros(len_arr)
+		self.data["nu"] = np.zeros(len_arr)
+		self.data["alpha"] = np.zeros(len_arr)
+		self.data["delta"] = np.zeros(len_arr)
+		self.data["gamma_ad"] = np.zeros(len_arr)
+		self.data["cP"] = np.zeros(len_arr)
+
+		#Calculate stepsizes
+		m_step = np.zeros(len_arr)
+		m_step[:-1] = self.data["M"][1:] - self.data["M"][:-1]
+		m_step[-1] = m_step[-2]
+
+		for i in range(len_arr):
+#			self.data["B_natural"][i] = self.magf.fBfld(self.data["R"][i], self.data["M"][i])
+#			self.data["Pmag_natural"][i] = (1./8./np.pi)*self.magf.fBfld(self.data["R"][i], self.data["M"][i])**2	#Get what user wants B(r) to be
+			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
+			[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
+			[adgradred, hydrograd, self.data["nu"][i], self.data["alpha"][i], self.data["delta"][i], self.data["gamma_ad"][i], self.data["cP"][i], cPydro_dumm, c_s_dumm] = self.geteosgradients(self.data["rho"][i], self.data["T"][i], Pmag)
+			self.data["nabla_ad"][i] = (self.data["Pgas"][i] + Pmag)/self.data["T"][i]*adgradred
+		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
+
+
+	def getconvection(self, fresh_calc=False):
+		"""Obtains convective structure, calculated using a combination of Eqn. 9 of Piro & Chang 08 and modified mixing length theory (http://adama.astro.utoronto.ca/~cczhu/runawaywiki/doku.php?id=magderiv#modified_limiting_cases_of_convection).  Currently doesn't account for magnetic energy in any way, so may not be consistent with MHD stars.
+		"""
+
+		# Obtain energies and additional stuff
+		if fresh_calc or not self.data.has_key("Epot"):
+			self.getenergies()
+
+		if fresh_calc or not self.data.has_key("dy"):
+			self.getgradients()
+
+		R = np.array(self.data["R"])
+		R[0] = max(1e-30, R[0])
+		dPdr = self.data["dy"][:,1]/self.data["dy"][:,0]
+		self.data["agrav"] = -dPdr/self.data["rho"]			# used to just be self.grav*self.data["M"]/R**2; now this is "agrav_norot" below
+		self.data["agrav_norot"] = self.grav*self.data["M"]/R**2
+		self.data["H_P"] = -self.data["Pgas"]/dPdr			# Assuming this is the GAS-ONLY SCALE HEIGHT!
+		self.data["H_P"][0] = self.data["H_P"][1]			# Removing singularity at zero
+		HPred = (self.data["Pgas"]/self.grav/self.data["rho"]**2)**0.5	# Reduced version that includes damping of H_P near r = 0; used for nabla calculations in derivatives
+		self.data["H_Preduced"] = np.array(self.data["H_P"])
+		self.data["H_Preduced"][HPred/self.data["H_P"] <= 1] = HPred[HPred/self.data["H_P"] <= 1]
+
+		# obtain epsilon_nuclear from Marten's MESA tables
+		self.data["eps_nuc"] = np.zeros(len(self.data["rho"]))
+		td = rtc.timescale_data(max_axes=[1e12,1e12])
+		eps_nuc_interp = td.getinterp2d("eps_nuc")
+		for i in range(len(self.data["eps_nuc"])):
+			self.data["eps_nuc"][i] = eps_nuc_interp(self.data["rho"][i], self.data["T"][i])
+
+		# obtain convective luminosity
+		self.data["Lnuc"] = 4.*np.pi*scipyinteg.cumtrapz(self.data["eps_nuc"]*R**2*self.data["rho"], x=R, initial=0.)
+		self.data["Lconv"] = self.data["Lnuc"]*(1. - self.data["Eth"]/max(self.data["Eth"])*max(self.data["Lnuc"])/self.data["Lnuc"])
+		self.data["Lconv"][0] = 0.
+		self.data["Fnuc"] = self.data["Lnuc"]/4./np.pi/R**2
+		self.data["Fconv"] = self.data["Lconv"]/4./np.pi/R**2
+		self.data["vconv"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
+		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
+		self.data["vnuc"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
+		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
+
+
 	def gettimescales(self, fresh_calc=False):
 		"""Obtains WWK04 integral and relevant timescales for convective transport, central nuclear burning, etc.
 		"""
@@ -990,48 +1497,17 @@ class maghydrostar_core():
 	def blankstar(cls, input_data, i_args=False, backcalculate=False, **kwargs):
 		"""Generates a dummy star, and loads in user-inputted stellar data.  Data structure MUST include "R", "M", "rho", "T" and "B" for self.backcalculate to work.  Arguments are otherwise identical to those of maghydrostar.__init__; for kwargs, see class constructor arguments.
 
-		Parameters
-		-----------
-		input_data: struct of data that MUST include M and T/S.  These can either be 
-			arrays or floats.
+		Arguments:
+		input_data: struct of data that MUST include M and T, but otherwise
 		i_args: input arguments to maghydrostar from runaway.py/make_runaway
 		backcalculate: backcalculate gradients and convective values
-		**kwargs: any additional arguments passable to class initialization function 
-			can be passed here.
-
-		Examples
-		--------
-		To load a star with a mass of 1Msun and a dummy central temperature 
-		(entropy in the case of mhs_steve):
-		>>> mystar = class.blankstar({"M": 1.9891e33, "T": 0.})
-		To generate a stellar profile using StarMod.maghydrostar, then read it
-		into blankstar:
-		>>> mystarold = StarMod.maghydrostar(1.9891e33, 1e8)
-		>>> mystar = class.blankstar(myoldstar.data)
-
+		**kwargs: any additional arguments passable to class initialization function can be passed here.
 		"""
-		try:
-			blnk_M = max(input_data["M"])
-		except:
-			blnk_M = input_data["M"]
-		if cls.__name__ == "mhs_steve":
-			try:
-				blnk_therm_c = input_data["Sgas"][0]
-			except:
-				blnk_therm_c = input_data["Sgas"]
-		else:
-			try:
-				blnk_therm_c = input_data["T"][0]
-			except:
-				blnk_therm_c = input_data["T"]
 
 		if i_args:
-			if cls.__name__ == "mhs_steve":
-				dataobj = cls(blnk_M, blnk_therm_c, magprofile=i_args["magprofile"], omega=i_args["omega"], S_want=False, mintemp=i_args["mintemp"], composition=i_args["composition"], togglecoulomb=i_args["tog_coul"], nablarat_crit=False, P_end_ratio=i_args["P_end_ratio"], ps_eostol=i_args["ps_eostol"], fakeouterpoint=i_args["fakeouterpoint"], stop_invertererr=i_args["stop_invertererr"], stop_mrat=i_args["stop_mrat"], stop_positivepgrad=i_args["stop_positivepgrad"], densest=False, mass_tol=i_args["mass_tol"], omega_crit_tol=i_args["omega_crit_tol"], nreps=100, stopcount_max=5, dontintegrate=True, verbose=False)
-			else:
-				dataobj = cls(blnk_M, blnk_therm_c, magprofile=i_args["magprofile"], omega=i_args["omega"], S_want=False, mintemp=i_args["mintemp"], composition=i_args["composition"], togglecoulomb=i_args["tog_coul"], simd_userot=i_args["simd_userot"], simd_usegammavar=i_args["simd_usegammavar"], simd_usegrav=i_args["simd_usegrav"], simd_suppress=i_args["simd_suppress"], nablarat_crit=False, P_end_ratio=i_args["P_end_ratio"], ps_eostol=i_args["ps_eostol"], fakeouterpoint=i_args["fakeouterpoint"], stop_invertererr=i_args["stop_invertererr"], stop_mrat=i_args["stop_mrat"], stop_positivepgrad=i_args["stop_positivepgrad"], densest=False, mass_tol=i_args["mass_tol"], omega_crit_tol=i_args["omega_crit_tol"], nreps=100, stopcount_max=5, dontintegrate=True, verbose=False)
+			dataobj = cls(max(input_data["M"]), input_data["T"][0], magprofile=i_args["magprofile"], omega=i_args["omega"], S_want=False, mintemp=i_args["mintemp"], composition=i_args["composition"], simd_userot=i_args["simd_userot"], simd_usegammavar=i_args["simd_usegammavar"], simd_usegrav=i_args["simd_usegrav"], simd_suppress=i_args["simd_suppress"], nablarat_crit=False, P_end_ratio=i_args["P_end_ratio"], ps_eostol=i_args["ps_eostol"], fakeouterpoint=i_args["fakeouterpoint"], stop_invertererr=i_args["stop_invertererr"], stop_mrat=i_args["stop_mrat"], stop_positivepgrad=i_args["stop_positivepgrad"], densest=False, mass_tol=i_args["mass_tol"], omega_crit_tol=i_args["omega_crit_tol"], nreps=100, stopcount_max=5, dontintegrate=True, verbose=False)
 		else:
-			dataobj = cls(blnk_M, blnk_therm_c, dontintegrate=True, **kwargs)
+			dataobj = cls(max(input_data["M"]), input_data["T"][0], dontintegrate=True, **kwargs)
 
 		dataobj.data = {}
 		for item in input_data.keys():
@@ -1043,7 +1519,7 @@ class maghydrostar_core():
 		return dataobj
 
 
-	def backcalculate(self):
+	def backcalculate(self, fresh_calc=False):
 		"""For situations where user-inputted R, M, rho, T and B are given, back-calculate.
 		"""
 
@@ -1069,4 +1545,47 @@ class maghydrostar_core():
 				if not self.data.has_key(item):
 					self.data[item] = cp.deepcopy(temp_data[item])
 
-		self.gettimescales(fresh_calc=True)
+		self.gettimescales(fresh_calc=fresh_calc)
+
+
+	def backcalculate_subloop(self):
+		"""maghydrostar subloop to backcalculate.
+		"""
+
+		datalength = len(self.data["M"])
+		m_step = self.data["M"][1:] - self.data["M"][:-1]
+		m_step = np.concatenate( [m_step, np.array([m_step[-1]])] )
+
+		# Create temporary housing for data
+		temp_data = {"Pgas": np.zeros(datalength),
+					"Sgas": np.zeros(datalength),
+					"Pmag": np.zeros(datalength),
+					"nabla_hydro": np.zeros(datalength),
+					"nabla_mhdr": np.zeros(datalength),
+					}
+
+		if self.simd_usegammavar:
+			self.data["dlngamdlnP"] = np.zeros(datalength)
+			self.data["nd_gamma"] = np.zeros(datalength)
+		if self.simd_usegrav:
+			self.data["dlngdlnP"] = np.zeros(datalength)
+			self.data["nd_grav"] = np.zeros(datalength)
+		if self.simd_userot:
+			self.data["nd_rot"] = np.zeros(datalength)
+
+		for i in range(datalength):
+			[temp_data["Pgas"][i], temp_data["Sgas"][i]] = self.getpress_rhoT(self.data["rho"][i], self.data["T"][i])
+			y_in = np.array([self.data["R"][i], temp_data["Pgas"][i], self.data["T"][i]])
+			[dummydy, dummyBfld, temp_data["Pmag"][i], temp_data["nabla_hydro"][i], temp_data["nabla_mhdr"][i], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
+
+			if self.simd_usegammavar:
+				self.data["dlngamdlnP"][i] = nabla_terms["dlngamdlnP"]
+				self.data["nd_gamma"][i] = nabla_terms["nd_gamma"]
+			if self.simd_usegrav:
+				self.data["dlngdlnP"][i] = nabla_terms["dlngdlnP"]
+				self.data["nd_grav"][i] = nabla_terms["nd_grav"]
+			if self.simd_userot:
+				self.data["nd_rot"][i] = nabla_terms["nd_rot"]
+
+		return temp_data
+

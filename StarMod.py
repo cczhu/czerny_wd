@@ -9,7 +9,6 @@ import myhelm_magstar as myhmag
 import rhoTcontours as rtc
 #from StarModCore import maghydrostar
 
-################HYDROSTAR CLASS###############################
 
 class maghydrostar():	#maghydrostar_core):
 	"""
@@ -143,49 +142,20 @@ class maghydrostar():	#maghydrostar_core):
 				omega_crit_tol=1e-3, nreps=30, stopcount_max=5, 
 				dontintegrate=False, verbose=True):
 
-		self.Msun = 1.9891e33
-		self.grav = 6.67384e-8
-		self.stepcoeff = 1e-2
-		self.mass_want = mass
-		self.mass_tol = mass_tol
-		self.temp_c = temp_c
-		self.nreps = nreps
-		self.nablarat_crit = nablarat_crit
+		maghydrostar_core.__init__(self, mass, temp_c, magprofile=magprofile, 
+				omega=omega, Lwant=Lwant, S_want=S_want, mintemp=mintemp, 
+				stop_mindenserr=stop_mindenserr, 
+				simd_userot=False, simd_usegammavar=False, 
+				simd_usegrav=False, densest=densest, omegaest=omegaest, 
+				mass_tol=mass_tol, L_tol=L_tol, omega_crit_tol=omega_crit_tol,
+				dontintegrate=True, verbose=verbose, **kwargs)
 
-		# recent additions to __init__ (formerly were just passed to getstarmodel).
-		self.fakeouterpoint = fakeouterpoint
-		self.stop_invertererr = stop_invertererr
-		self.stop_mrat = stop_mrat
-		self.stop_positivepgrad = stop_positivepgrad
-		self.stop_mindenserr = stop_mindenserr
-		self.s_mind_errcode = False	# If True, returns mindenserr as an outerr_code (usually unwanted behaviour)
-		self.stopcount_max = stopcount_max
-		self.omega_crit_tol = omega_crit_tol
-		self.L_want = Lwant
-		self.L_tol = L_tol
-
-		self.togglecoulomb = togglecoulomb
-
-		# Remember to print messages
-		self.verbose = verbose
-
-		# If magprofile is false, generate a zero-field profile
-		if not magprofile:
-			if self.verbose:
-				print "magprofile == False - will assume star has no magnetic field!"
-			self.magf = magprof.magprofile(None, None, None, None, blankfunc=True)
-		else:
-			self.magf = magprofile
-
-		self.mintemp = mintemp
-		self.mintemp_reltol = 1e-6
-		if self.verbose:
-			print "Minimum temperature set to {0:.3e}".format(self.mintemp)
-
+		# Set up derivative functions
 		self.simd_userot = simd_userot
 		self.simd_usegammavar = simd_usegammavar
 		self.simd_usegrav = simd_usegrav
 		self.simd_suppress = simd_suppress
+		self.nablarat_crit = nablarat_crit
 
 		if self.simd_usegammavar and self.verbose:
 			print "VARIABLE GAMMA TERM included in nabla deviation!"
@@ -196,62 +166,25 @@ class maghydrostar():	#maghydrostar_core):
 		if self.simd_suppress and self.verbose:
 			print "WARNING - YOU'LL BE SUPPRESSING nabla DEVIATIONS IN THE FIRST MASS STEP!  I HOPE YOU HAVE A GOOD REASON!"
 
-		if omega < 0.:
-			if self.verbose:
-				print "Omega < 0 - max rotation estimator selected!"
-			self.omega = 0.
-		else:
-			if self.verbose:
-				print "Omega = {0:.3e}".format(omega)
-			self.omega = max(0., omega)
-
-		if composition == "He":
-			if self.verbose:
-				print "Composition set to HELIUM"
-			self.abar = 4.0
-		elif composition == "Mg":
-			if self.verbose:
-				print "Composition set to MAGNESIUM"
-			self.abar = 24.0
-		else:
-			if self.verbose:
-				print "Composition set to CARBON-OXYGEN (50% mix by mass)"
-			self.abar = 13.714285714285715
-		self.zbar = self.abar/2.	# Will need changing when we start looking at weirder stars.
-
-		# In the future, adapt other EOSs?
-
-		# Run a dummy gethelmeos to check if EOS is initialized:
-		pressure,energy,soundspeed,gammaout,entropy,checkeosfailure = myhmag.gethelmholtzeos(1e5,1e2,2.,4.,True)
-		if checkeosfailure:					# If 1 is returned...
-			print "I noticed you haven't initialized helmholtz.  Doing so now."
-			myhmag.initializehelmholtz()	# ...initialize helmholtz
-
-		# Check if magnetic field should be back-calculated or obtained from spline
-		if type(magprofile) == float or type(magprofile) == np.float64:
-			self.nabladev = magprofile
-			if self.nabladev <= 0.:
-				raise AssertionError("ERROR: if you use a constant delta field, then magprofile must be a positive value!")
-			if self.verbose:
-				print "Derivative WITH CONSTANT DEVIATION RATIO {0:.3e} selected! Using self.nabladev as deviation delta(r) (MM09 Eqn. 4).".format(self.nabladev)
-		else:
-			self.nabladev = False
 		# derivatives_gtsh now handles both constant deviation and user-defined magnetic profile.
 		self.derivatives = self.derivatives_gtsh
 		self.first_deriv = self.first_derivatives_gtsh
 
-		self.data = {}
 		if dontintegrate:
 			if self.verbose:
 				print "WARNING: integration disabled within maghydrostar!"
 		else:
-			if omega < 0.:
+			if self.omega < 0.:
+				self.omega = 0.
 				self.getmaxomega(P_end_ratio=P_end_ratio, densest=densest, S_want=S_want, ps_eostol=ps_eostol)
 			else:
 				if Lwant:
 					self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, damp_nrstep=0.25)
 				else:
 					self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
+
+		# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
+		assert self.omega >= 0.
 
 
 ######################################### SHOOTING ALGORITHMS #########################################
@@ -1576,9 +1509,8 @@ class maghydrostar():	#maghydrostar_core):
 
 		for i in range(datalength):
 			[temp_data["Pgas"][i], temp_data["Sgas"][i]] = self.getpress_rhoT(self.data["rho"][i], self.data["T"][i])
-			[dydx, Bfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms]
-			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
-			[dummydy, dummyBfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
+			y_in = np.array([self.data["R"][i], temp_data["Pgas"][i], self.data["T"][i]])
+			[dummydy, dummyBfld, temp_data["Pmag"][i], temp_data["nabla_hydro"][i], temp_data["nabla_mhdr"][i], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
 
 			if self.simd_usegammavar:
 				self.data["dlngamdlnP"][i] = nabla_terms["dlngamdlnP"]

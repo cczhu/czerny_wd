@@ -9,7 +9,6 @@ from StarModCore import maghydrostar_core
 import magprofile_mass as magprof
 import Sprofile_mass as sprof
 
-################EndSimmer CLASS###############################
 
 class mhs_steve(maghydrostar_core):
 	"""
@@ -117,14 +116,18 @@ class mhs_steve(maghydrostar_core):
 			if self.verbose:
 				print "WARNING: integration disabled within mhs_steve!"
 		else:
-			if omega < 0.:
-				self.getmaxomega(densest=densest, S_want=S_want)
+			if self.omega < 0.:
+				self.omega = 0.
+				self.getmaxomega(P_end_ratio=P_end_ratio, densest=densest, S_want=S_want, ps_eostol=ps_eostol)
 			else:
 				if Lwant:
 					self.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, damp_nrstep=0.25)
 					#self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, damp_nrstep=0.25)
 				else:
 					self.getstarmodel(densest=densest, S_want=S_want)
+
+		# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
+		assert self.omega >= 0.
 
 
 	def populateS_old(self, S_old):
@@ -133,6 +136,9 @@ class mhs_steve(maghydrostar_core):
 		self.S_old = S_old.S_old
 		self.dS_old = S_old.dS_old
 		self.vconv_Sold = S_old.vconv_Sold
+
+
+######################################## INTEGRATOR ########################################
 
 
 	def integrate_star(self, dens_c, temp_c, omega, recordstar=False, P_end_ratio=1e-8, ps_eostol=1e-8, outputerr=False):
@@ -191,7 +197,7 @@ class mhs_steve(maghydrostar_core):
 		R, P, temp, Bfld, Pmag, hydrograd, totalgrad, nabla_terms, dy, isotherm = self.first_deriv(
 																				dens, M, Pc, temp, omega, failtrig=errtrig)
 		[dens, entropy] = self.getdens_PT(P, temp, failtrig=errtrig)
-		self.advanceFconv(dens, R, temp, M, stepsize)
+		self.advanceFconv(dens, R, temp, stepsize)
 
 		# If the inversion (will only be used if simd_usegammavar is active) in very first step fails, throw up an error and quit
 		if errtrig[0]:
@@ -267,7 +273,7 @@ class mhs_steve(maghydrostar_core):
 			else:
 				M += stepsize
 
-			self.advanceFconv(dens, R, temp, M, stepsize)
+			self.advanceFconv(dens, R, temp, stepsize)
 
 			if recordstar:
 				self.data["M"].append(M)
@@ -328,7 +334,7 @@ class mhs_steve(maghydrostar_core):
 														h0=stepsize*0.01, hmax = stepsize, mxstep=1000)[1,:]
 				else:
 					y_out = scipyinteg.odeint(self.derivatives, y_in, np.array([M,M+stepsize]), args=(omega, self.fconv_data["Fconv_st"][-1], errtrig, ps_eostol, stepsize, isotherm), h0=stepsize*0.01, hmax = stepsize)[1,:]
-				self.advanceFconv(0., y_out[0], 0., M+stepsize, Mstep)
+				self.advanceFconv(0., y_out[0], 0., Mstep)
 				self.data["M"].append(max(self.mass_want, M+stepsize))
 				self.data["R"].append(y_out[0])
 				self.data["Pgas"].append(0.)
@@ -447,24 +453,34 @@ class mhs_steve(maghydrostar_core):
 		return [R, P, temp, sM]
 
 
-	def advanceFconv(self, dens, R, T, M, Mstep, togglecoulomb=True):
+	def advanceFconv(self, dens, R, T, Mstep):
 		"""
 		Integrates Fconv, step by step using trapezoidal rule
 		(https://en.wikipedia.org/wiki/Trapezoidal_rule), where 
-		F = 0.5*SUM(dx*(y_i+1 + y_i)).  Here, L = 0.5*SUM(dM*(eps[i+1] + eps[i])),
-		and Eth = 0.5*SUM(dM*(eth[i+1] + eth[i]))
+		F_i+1 = F_i + 0.5*dx_i*(y_i+1 + y_i).  Here, dens and T are 
+		used to calculate eps_i+1, and then L_i+1 = L_i + 
+		0.5*dM_i*(eps_i + eps_i+1) and F_i+1 = L_i+1/(4*pi*R_i+1). Currently
+		NO DISTINCTION is made between L_nuc and L_conv.
+
+		In integrate_star, advanceFconv must be called AFTER a derivative step 
+		is called, but BEFORE the stepsize is recalculated.  This gives us the
+		proper dens and T to calculate eps_i+1, but keeps dM as dM_i.
 		"""
-		# Use current eps_nuc and previous to integrate to current Lnuc
-		self.fconv_data["eps_nuc_st"].append(self.eps_nuc_interp(dens, T))	# Calculate CURRENT eps_nuc
+		# Calculate eps_i+1
+		self.fconv_data["eps_nuc_st"].append(self.eps_nuc_interp(dens, T))
+		# Calculate L_i+1 = L_i + 0.5*dM_i*(eps_i + eps_i+1)
 		self.fconv_data["Lnuc_st"].append(self.fconv_data["Lnuc_st"][-1] + 0.5*Mstep*(self.fconv_data["eps_nuc_st"][-1] + self.fconv_data["eps_nuc_st"][-2]))
-		# Use eth to integrate current Eth
-#		[new_eint, new_edeg, dumm_c_s] = self.gethelmeos_energies(dens, T, togglecoulomb=togglecoulomb)
+
+		# NOT CURRENTLY BEING USED FOR ANYTHING
+#		[new_eint, new_edeg, dumm_c_s] = self.gethelmeos_energies(dens, T)
 #		self.fconv_data["eth"].append(new_eint - new_edeg)				# Calculate CURRENT eth
 #		self.fconv_data["Eth"].append(self.fconv_data["Eth"][-1] + 0.5*Mstep*(self.fconv_data["eth"][-1] + self.fconv_data["eth"][-2]))
 
-		self.fconv_data["Lconv_st"].append(self.fconv_data["Lnuc_st"][-1])			#TEMPORARY
+		# Right now, HARDCODING Lconv = Lnuc
+		self.fconv_data["Lconv_st"].append(self.fconv_data["Lnuc_st"][-1])
 
-		self.fconv_data["Fconv_st"].append(self.fconv_data["Lconv_st"][-1]/(4.*np.pi*R**2))		# Can't integrate this independently, of course.
+		# F_i+1 = L_i+1/(4*pi*R_i+1).
+		self.fconv_data["Fconv_st"].append(self.fconv_data["Lconv_st"][-1]/(4.*np.pi*R**2))
 
 
 	def unpack_nabla_terms(self):
@@ -624,14 +640,11 @@ class mhs_steve(maghydrostar_core):
 
 ########################################### POSTPROCESSING FUNCTIONS #############################################
 
-	def getgradients(self, togglecoulomb=True):
+	def getgradients(self):
 		"""Obtains magnetohydrostatic gradients for diagnosing stellar structures.  Requires a profile to have already been made (but can be run on partially complete sets).
 		"""
 
 		len_arr = len(self.data["rho"])
-#		self.data["dy"] = np.zeros([len_arr,3])
-#		self.data["B_natural"] = np.zeros(len_arr)
-#		self.data["Pmag_natural"] = np.zeros(len_arr)
 		self.data["nabla_ad"] = np.zeros(len_arr)
 		self.data["nu"] = np.zeros(len_arr)
 		self.data["alpha"] = np.zeros(len_arr)
@@ -646,13 +659,12 @@ class mhs_steve(maghydrostar_core):
 
 		for i in range(len_arr):
 			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
-#			[self.data["dy"][i], Bfld, Pmag, hydrograd, totalgrad, nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, self.fconv_data["Fconv_st"][i], m_step=m_step[i], grad_full=True)
 			[adgradred, hydrograd, self.data["nu"][i], self.data["alpha"][i], self.data["delta"][i], self.data["gamma_ad"][i], self.data["cP"][i], cPydro_dumm, c_s_dumm] = self.geteosgradients(self.data["rho"][i], self.data["T"][i], self.data["Pmag"][i])
 			self.data["nabla_ad"][i] = (self.data["Pgas"][i] + self.data["Pmag"][i])/self.data["T"][i]*adgradred
 		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
 
 
-	def getconvection(self, td=False, togglecoulomb=True, fresh_calc=False):
+	def getconvection(self, td=False, fresh_calc=False):
 		"""Obtains convective structure, calculated using a combination of Eqn. 9 of Piro & Chang 08 and modified mixing length theory (http://adama.astro.utoronto.ca/~cczhu/runawaywiki/doku.php?id=magderiv#modified_limiting_cases_of_convection).  Currently doesn't account for magnetic energy in any way, so may not be consistent with MHD stars.
 		"""
 
@@ -710,30 +722,27 @@ class mhs_steve(maghydrostar_core):
 					"Pmag": np.zeros(datalength),
 					"nabla_hydro": np.zeros(datalength),
 					"nabla_mhdr": np.zeros(datalength),
+					"dy": np.zeros([datalength,3])
 					}
 
-		if self.simd_usegammavar:
-			self.data["dlngamdlnP"] = np.zeros(datalength)
-			self.data["nd_gamma"] = np.zeros(datalength)
-		if self.simd_usegrav:
-			self.data["dlngdlnP"] = np.zeros(datalength)
-			self.data["nd_grav"] = np.zeros(datalength)
-		if self.simd_userot:
-			self.data["nd_rot"] = np.zeros(datalength)
+		self.data["nabla_terms"] = []	# Not very pretty, but a blank class instance shouldn't have initialized these in the first place.
+		self.fconv_data = {"Lnuc_st": [0],
+					"Lconv_st": [0],
+					"Fconv_st": [0],
+					"eps_nuc_st": [self.eps_nuc_interp(self.data["rho"][0], self.data["T"][0])]}
 
 		for i in range(datalength):
 			[temp_data["Pgas"][i], temp_data["Sgas"][i]] = self.getpress_rhoT(self.data["rho"][i], self.data["T"][i])
-			[dydx, Bfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms]
-			y_in = np.array([self.data["R"][i], self.data["Pgas"][i], self.data["T"][i]])
-			[dummydy, dummyBfld, temp_data["Pmag"], temp_data["nabla_hydro"], temp_data["nabla_mhdr"], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, m_step=m_step[i], grad_full=True)
+			if i > 0:
+				self.advanceFconv(self.data["rho"][i], self.data["R"][i], self.data["T"][i], m_step[i-1])
+			y_in = np.array([self.data["R"][i], temp_data["Pgas"][i], self.data["T"][i]])
+			[temp_data["dy"][i], dummyBfld, temp_data["Pmag"][i], temp_data["nabla_hydro"][i], temp_data["nabla_mhdr"][i], nabla_terms] = self.derivatives(y_in, self.data["M"][i], self.omega, self.fconv_data["Fconv_st"][i], m_step=m_step[i], grad_full=True)
+			self.data["nabla_terms"].append(nabla_terms)
 
-			if self.simd_usegammavar:
-				self.data["dlngamdlnP"][i] = nabla_terms["dlngamdlnP"]
-				self.data["nd_gamma"][i] = nabla_terms["nd_gamma"]
-			if self.simd_usegrav:
-				self.data["dlngdlnP"][i] = nabla_terms["dlngdlnP"]
-				self.data["nd_grav"][i] = nabla_terms["nd_grav"]
-			if self.simd_userot:
-				self.data["nd_rot"][i] = nabla_terms["nd_rot"]
+		# Because derivatives_steve wasn't meant to be used at the origin
+		temp_data["nabla_mhdr"][0] = temp_data["nabla_mhdr"][1]
+
+		self.unpack_nabla_terms()
+		self.unpack_Fconv()
 
 		return temp_data
