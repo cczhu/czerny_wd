@@ -12,14 +12,55 @@ import Sprofile_mass as sprof
 
 class mhs_steve(maghydrostar_core):
 	"""
-	Magnetohydrostatic star generator.  Generates spherical WDs with 
-	adiabatic temperature profiles using the Helmholtz 
+	Stevenson-based magnetohydrostatic star generator.  Generates spherical 
+	WDs with adiabatic temperature profiles using the Helmholtz 
 	(http://cococubed.asu.edu/code_pages/eos.shtml) EOS, rigid rotation 
-	spherical approximation based on Stevenson 1979 and Barker et al. 2014.  
-	All values in CGS.
+	spherical approximation based on Stevenson 1979.  All values in CGS.
 
-	Parameters
-	----------
+	Parameters (Common across maghydrostar)
+	---------------------------------------
+	mass : wanted mass (g)
+	temp_c : wanted central temperature (K).  If you want to use entropy, 
+		then populate S_want (code will then ignore this value and 
+		calculate self-consistent temp_c).
+	magprofile : magnetic profile object.  Defaults to false, meaning no 
+		magnetic field.  To insert a user-defined field, insert a magf object.
+		To generate a field with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas),
+		insert a float equal to delta.		
+	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
+		rotating).  If < 0, code attempts to estimate break-up omega with 
+		self.getomegamax(), if >= 0, uses user defined value.
+	Lwant : wanted angular momentum.
+	mintemp : temperature floor (K), effectively switches from adiabatic 
+		to isothermal profile if reached.
+	composition : "CO", "Mg" or "He" composition.
+	togglecoulomb : includes Coulomb corrections in EOS (corrections are 
+		included even if specific entropy becomes negative).
+	fakeouterpoint : add additional point to profile where M = mass_want to 
+		prevent interpolation attempts from failing.
+	stop_invertererr : stop integrating when EOS error is reached.
+	stop_mrat : stop integrating when integrated M is larger than 
+		stop_mrat*mass.
+	stop_positivepgrad : stop integrating when dP/dr becomes positive.
+	stop_mindenserr : density floor, below which integration is halted.
+		Default is set to 1e-10 to prevent it from ever being reached.  
+		Helmholtz sometimes has trouble below this 1e-8; try adjusting this
+		value to eliminate inverter errors.
+	mass_tol : fractional tolerance between mass wanted and mass produced 
+		by self.getstarmodel()
+	L_tol : fractional tolerance between L wanted and L produced 
+		by self.getrotatingstarmodel()
+	omega_crit_tol : when using the self.getomegamax() iterative finder, 
+		absolute error tolerance for maximum omega.
+	nreps : max number of attempts to find a star in self.getstarmodel().
+	stopcount_max : when self.getstarmodel() detects that wanted mass and 
+					temp_c/S_want combination may not be achievable, number 
+					of stellar integration iterations to take before 
+					testing for global extrema.
+	verbose : report happenings within code.
+
+	Parameters (Unique to mhs_steve)
+	---------------------------------
 	mass : wanted mass (g)
 	S_want : user-specified central entropy (erg/K)
 	magprofile : magnetic profile object.  Defaults to false, meaning no 
@@ -54,14 +95,12 @@ class mhs_steve(maghydrostar_core):
 	verbose : report happenings within code.
 	dontintegrate: don't perform any integration
 
-
 	Returns
 	-------
 	mystar : mhs_steve class instance
 		If star was integrated and data written, results can be found in
 		mystar.data.  Further analysis can be performed with 
 		mystar.getenergies,	mystar.getgradients and mystar.getconvection.
-
 
 	Notes
 	-----
@@ -76,41 +115,45 @@ class mhs_steve(maghydrostar_core):
 	"""
 
 	def __init__(self, mass, S_want, magprofile=False, omega=0., Lwant=0., 
-				temp_c=False, mintemp=1e5, stop_mindenserr=1e-10, S_old=False,
+				temp_c=False, mintemp=1e5, composition="CO", togglecoulomb=True,
+				S_old=False, P_end_ratio=1e-8, ps_eostol=1e-8, 
+				fakeouterpoint=False, stop_invertererr=True, 
+				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
 				densest=False, omegaest=False, mass_tol=1e-6, L_tol=1e-6, 
-				omega_crit_tol=1e-3, verbose=True, dontintegrate=False,
-				**kwargs):
-
-		td = rtc.timescale_data(max_axes=[1e12,1e12])
-		self.eps_nuc_interp = td.getinterp2d("eps_nuc")
-		if S_old:
-			self.populateS_old(S_old)
-		else:
-			self.S_old = False
-		if self.S_old and verbose:
-			print "S_old defined!  Will use old entropy profile if new one dips below it."
-
-		self.S_old_reltol = 1e-6
-
-		# maghydrostar class initialization: DONTINTEGRATE MUST BE SET
-		# TO TRUE FOR CURRENT CODE TO WORK!
-		maghydrostar_core.__init__(self, mass, temp_c, magprofile=magprofile, 
-				omega=omega, Lwant=Lwant, S_want=S_want, mintemp=mintemp, 
-				stop_mindenserr=stop_mindenserr, 
-				simd_userot=False, simd_usegammavar=False, 
-				simd_usegrav=False, densest=densest, omegaest=omegaest, 
-				mass_tol=mass_tol, L_tol=L_tol, omega_crit_tol=omega_crit_tol,
-				dontintegrate=True, verbose=verbose, **kwargs)
-
-		self.derivatives = self.derivatives_steve
-		self.first_deriv = self.first_derivatives_steve
-		if self.verbose:		# self.verbose is implicitly defined in maghydrostar
-			print "Replacing derivatives_gtsh with derivatives_steve!"
+				omega_crit_tol=1e-3, nreps=30, stopcount_max=5, 
+				dontintegrate=False, verbose=True):
 
 		# Stop doing whatever if user inserts rotation and B field
 		if magprofile and omega != 0.:
 			print "You cannot currently insert a magnetic field simultaneously with non-zero rotation!  Quitting."
 			return
+
+		maghydrostar_core.__init__(self, mass, temp_c, magprofile=magprofile, 
+				omega=omega, Lwant=Lwant, mintemp=mintemp,
+				composition=composition, togglecoulomb=togglecoulomb,
+				fakeouterpoint=fakeouterpoint, stop_invertererr=stop_invertererr,
+				stop_mrat=stop_mrat, stop_positivepgrad=stop_positivepgrad, 
+				stop_mindenserr=stop_mindenserr, mass_tol=mass_tol, L_tol=L_tol, 
+				omega_crit_tol=omega_crit_tol, nreps=nreps, 
+				stopcount_max=stopcount_max, verbose=verbose)
+
+		self.nablarat_crit = False			# This should only be used for debugging!
+
+		# Initialize nuclear specific energy generation rate
+		td = rtc.timescale_data(max_axes=[1e12,1e12])
+		self.eps_nuc_interp = td.getinterp2d("eps_nuc")
+		if S_old:
+			self.populateS_old(S_old)
+			if verbose:
+				print "S_old defined!  Will use old entropy profile if new one dips below it."
+		else:
+			self.S_old = False
+		self.S_old_reltol = 1e-6	# Relative tolerance to shoot for in connect_S_old
+
+		self.derivatives = self.derivatives_steve
+		self.first_deriv = self.first_derivatives_steve
+		if self.verbose:		# self.verbose is implicitly defined in maghydrostar
+			print "Stevenson 79 derivative selected!"
 
 		if dontintegrate:
 			if self.verbose:
@@ -640,6 +683,7 @@ class mhs_steve(maghydrostar_core):
 
 ########################################### POSTPROCESSING FUNCTIONS #############################################
 
+
 	def getgradients(self):
 		"""Obtains magnetohydrostatic gradients for diagnosing stellar structures.  Requires a profile to have already been made (but can be run on partially complete sets).
 		"""
@@ -664,49 +708,8 @@ class mhs_steve(maghydrostar_core):
 		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
 
 
-	def getconvection(self, td=False, fresh_calc=False):
-		"""Obtains convective structure, calculated using a combination of Eqn. 9 of Piro & Chang 08 and modified mixing length theory (http://adama.astro.utoronto.ca/~cczhu/runawaywiki/doku.php?id=magderiv#modified_limiting_cases_of_convection).  Currently doesn't account for magnetic energy in any way, so may not be consistent with MHD stars.
-		"""
-
-		# Obtain energies and additional stuff
-		if fresh_calc or not self.data.has_key("Epot"):
-			self.getenergies()
-
-		if fresh_calc or not self.data.has_key("gamma_ad"):
-			self.getgradients()
-
-		R = np.array(self.data["R"])
-		R[0] = max(1e-30, R[0])
-		dPdr = self.data["dy"][:,1]/self.data["dy"][:,0]
-		self.data["agrav"] = -dPdr/self.data["rho"]			# used to just be self.grav*self.data["M"]/R**2; now this is "agrav_norot" below
-		self.data["agrav_norot"] = self.grav*self.data["M"]/R**2
-		self.data["H_P"] = -self.data["Pgas"]/dPdr			# Assuming this is the GAS-ONLY SCALE HEIGHT!
-		self.data["H_P"][0] = self.data["H_P"][1]			# Removing singularity at zero
-		HPred = (self.data["Pgas"]/self.grav/self.data["rho"]**2)**0.5	# Reduced version that includes damping of H_P near r = 0; used for nabla calculations in derivatives
-		self.data["H_Preduced"] = np.array(self.data["H_P"])
-		self.data["H_Preduced"][HPred/self.data["H_P"] <= 1] = HPred[HPred/self.data["H_P"] <= 1]
-
-		# obtain epsilon_nuclear from Marten's MESA tables
-		self.data["eps_nuc"] = np.zeros(len(self.data["rho"]))
-		if not td:
-			td = rtc.timescale_data(max_axes=[1e12,1e12])
-		eps_nuc_interp = td.getinterp2d("eps_nuc")
-		for i in range(len(self.data["eps_nuc"])):
-			self.data["eps_nuc"][i] = eps_nuc_interp(self.data["rho"][i], self.data["T"][i])
-
-		# obtain convective luminosity
-		self.data["Lnuc"] = 4.*np.pi*scipyinteg.cumtrapz(self.data["eps_nuc"]*R**2*self.data["rho"], x=R, initial=0.)
-		self.data["Lconv"] = self.data["Lnuc"]*(1. - self.data["Eth"]/max(self.data["Eth"])*max(self.data["Lnuc"])/self.data["Lnuc"])
-		self.data["Lconv"][0] = 0.
-		self.data["Fnuc"] = self.data["Lnuc"]/4./np.pi/R**2
-		self.data["Fconv"] = self.data["Lconv"]/4./np.pi/R**2
-		self.data["vconv"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
-		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
-		self.data["vnuc"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
-		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
-
-
 ########################################### BLANK STARMOD FOR POST-PROCESSING #############################################
+
 
 	def backcalculate_subloop(self):
 		"""mhs_steve subloop to backcalculate.

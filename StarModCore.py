@@ -15,6 +15,13 @@ class maghydrostar_core():
 	of state functions and common post-processing functions.  Parent class of 
 	maghydrostar and mhs_steve; see child class documentation for more details.
 
+	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
+				mintemp=1e5, composition="CO", togglecoulomb=True,
+				fakeouterpoint=False, stop_invertererr=True, 
+				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
+				mass_tol=1e-6, L_tol=1e-6, omega_crit_tol=1e-3, nreps=30, 
+				stopcount_max=5, verbose=True):
+
 	Parameters
 	----------
 	mass : wanted mass (g)
@@ -26,28 +33,14 @@ class maghydrostar_core():
 		To generate a field with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas),
 		insert a float equal to delta.		
 	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
-		rotating).  If < 0, attempts to estimate break-up omega with 
+		rotating).  If < 0, code attempts to estimate break-up omega with 
 		self.getomegamax(), if >= 0, uses user defined value.
 	Lwant : wanted angular momentum.
-	S_want : use a user-specified central entropy (erg/K) INSTEAD OF 
-		temperature temp_c.
 	mintemp : temperature floor (K), effectively switches from adiabatic 
 		to isothermal profile if reached.
 	composition : "CO", "Mg" or "He" composition.
-	simd_userot : use Solberg-Hoiland deviation from adiabatic temperature 
-		gradient.
-	simd_usegammavar : use gamma = c_P/c_V index magnetic deviation from 
-		adiabatic temperature gradient.
-	simd_usegrav : use gravity magnetic devation from adiabatic temperature 
-		gradient.
-	simd_suppress : suppresses deviations from adiabaticity in first step of 
-		integration.
-	nablarat_crit : software crash toggle if nabla ever becomes too 
-		large - only useful for developmental purposes!
-	P_end_ratio : ratio of P/P_c at which to terminate stellar integration.
-	ps_eostol : tolerance ONLY IN myhmag.geteosinversionsp_withest RIGHT NOW 
-		(when inverting Helmholtz EOS to find density/temperature from 
-		pressure/entropy).
+	togglecoulomb : includes Coulomb corrections in EOS (corrections are 
+		included even if specific entropy becomes negative).
 	fakeouterpoint : add additional point to profile where M = mass_want to 
 		prevent interpolation attempts from failing.
 	stop_invertererr : stop integrating when EOS error is reached.
@@ -58,9 +51,6 @@ class maghydrostar_core():
 		Default is set to 1e-10 to prevent it from ever being reached.  
 		Helmholtz sometimes has trouble below this 1e-8; try adjusting this
 		value to eliminate inverter errors.
-	densest : central density initial estimate for self.getstarmodel().
-	omegaest : estimate of rigid rotating angular speed.  Default is False
-		- code wil then use 0.75*mystar.L_want/I.
 	mass_tol : fractional tolerance between mass wanted and mass produced 
 		by self.getstarmodel()
 	L_tol : fractional tolerance between L wanted and L produced 
@@ -72,20 +62,16 @@ class maghydrostar_core():
 					temp_c/S_want combination may not be achievable, number 
 					of stellar integration iterations to take before 
 					testing for global extrema.
-	dontintegrate : set up the problem, but don't shoot for a star.
 	verbose : report happenings within code.
 
 	Returns
 	-------
-	mystar : maghydrostar class instance
-		If star was integrated and data written, results can be found in
-		mystar.data.  Further analysis can be performed with 
-		mystar.getenergies,	mystar.getgradients and mystar.getconvection.
+	mscore : maghydrostar_core class instance
 	"""
 
 	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
 				mintemp=1e5, composition="CO", togglecoulomb=True,
-				P_end_ratio=1e-8, fakeouterpoint=False, stop_invertererr=True, 
+				fakeouterpoint=False, stop_invertererr=True, 
 				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
 				mass_tol=1e-6, L_tol=1e-6, omega_crit_tol=1e-3, nreps=30, 
 				stopcount_max=5, verbose=True):
@@ -145,6 +131,7 @@ class maghydrostar_core():
 			if self.verbose:
 				print "magprofile == False - will assume star has no magnetic field!"
 			self.magf = magprof.magprofile(None, None, None, None, blankfunc=True)
+			self.nabladev = False
 		elif (type(magprofile) == float or type(magprofile) == np.float64):		# If magprofile is constant nabladev = delta = B^2/(B^2 + 4pi*Gamma1*Pgas)
 			self.nabladev = magprofile
 			if self.nabladev <= 0.:
@@ -158,7 +145,7 @@ class maghydrostar_core():
 
 		# Temperature floor
 		self.mintemp = mintemp
-		self.mintemp_reltol = 1e-6
+		self.mintemp_reltol = 1e-6	# Relative tolerance to shoot for in connect_isotherm
 		if self.verbose:
 			print "Minimum temperature set to {0:.3e}".format(self.mintemp)
 
@@ -960,6 +947,48 @@ class maghydrostar_core():
 		self.data["Erot"] = 0.5*self.getmomentofinertia(self.data["R"], self.data["rho"])*self.omega**2
 		self.data["eb"] = self.data["B"]**2/8./np.pi/self.data["rho"]	# B^2/8pi is the magnetic energy density
 		self.data["EB"] = 0.5*scipyinteg.cumtrapz(self.data["B"]**2*self.data["R"]**2, x=self.data["R"], initial=0.)
+
+
+	def getconvection(self, td=False, fresh_calc=False):
+		"""Obtains convective structure, calculated using a combination of Eqn. 9 of Piro & Chang 08 and modified mixing length theory (http://adama.astro.utoronto.ca/~cczhu/runawaywiki/doku.php?id=magderiv#modified_limiting_cases_of_convection).  Currently doesn't account for magnetic energy in any way, so may not be consistent with MHD stars.
+		"""
+
+		# Obtain energies and additional stuff
+		if fresh_calc or not self.data.has_key("Epot"):
+			self.getenergies()
+
+		if fresh_calc or not self.data.has_key("gamma_ad"):
+			self.getgradients()
+
+		R = np.array(self.data["R"])
+		R[0] = max(1e-30, R[0])
+		dPdr = self.data["dy"][:,1]/self.data["dy"][:,0]
+		self.data["agrav"] = -dPdr/self.data["rho"]			# used to just be self.grav*self.data["M"]/R**2; now this is "agrav_norot" below
+		self.data["agrav_norot"] = self.grav*self.data["M"]/R**2
+		self.data["H_P"] = -self.data["Pgas"]/dPdr			# Assuming this is the GAS-ONLY SCALE HEIGHT!
+		self.data["H_P"][0] = self.data["H_P"][1]			# Removing singularity at zero
+		HPred = (self.data["Pgas"]/self.grav/self.data["rho"]**2)**0.5	# Reduced version that includes damping of H_P near r = 0; used for nabla calculations in derivatives
+		self.data["H_Preduced"] = np.array(self.data["H_P"])
+		self.data["H_Preduced"][HPred/self.data["H_P"] <= 1] = HPred[HPred/self.data["H_P"] <= 1]
+
+		# obtain epsilon_nuclear from Marten's MESA tables
+		self.data["eps_nuc"] = np.zeros(len(self.data["rho"]))
+		if not td:
+			td = rtc.timescale_data(max_axes=[1e12,1e12])
+		eps_nuc_interp = td.getinterp2d("eps_nuc")
+		for i in range(len(self.data["eps_nuc"])):
+			self.data["eps_nuc"][i] = eps_nuc_interp(self.data["rho"][i], self.data["T"][i])
+
+		# obtain convective luminosity
+		self.data["Lnuc"] = 4.*np.pi*scipyinteg.cumtrapz(self.data["eps_nuc"]*R**2*self.data["rho"], x=R, initial=0.)
+		self.data["Lconv"] = self.data["Lnuc"]*(1. - self.data["Eth"]/max(self.data["Eth"])*max(self.data["Lnuc"])/self.data["Lnuc"])
+		self.data["Lconv"][0] = 0.
+		self.data["Fnuc"] = self.data["Lnuc"]/4./np.pi/R**2
+		self.data["Fconv"] = self.data["Lconv"]/4./np.pi/R**2
+		self.data["vconv"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
+		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
+		self.data["vnuc"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
+		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
 
 
 	def gettimescales(self, fresh_calc=False):
