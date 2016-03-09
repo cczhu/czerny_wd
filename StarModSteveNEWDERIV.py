@@ -12,116 +12,7 @@ import Sprofile_mass as sprof
 
 class mhs_steve(maghydrostar_core):
 	"""
-	Stevenson-based magnetohydrostatic star generator.  Generates spherical 
-	WDs with adiabatic temperature profiles using the Helmholtz 
-	(http://cococubed.asu.edu/code_pages/eos.shtml) EOS, rigid rotation 
-	spherical approximation based on Stevenson 1979.  All values in CGS.
-
-	Parameters (Common across maghydrostar)
-	---------------------------------------
-	mass : wanted mass (g)
-	temp_c : wanted central temperature (K).  If you want to use entropy, 
-		then populate S_want (code will then ignore this value and 
-		calculate self-consistent temp_c).
-	magprofile : magnetic profile object.  Defaults to false, meaning no 
-		magnetic field.  To insert a user-defined field, insert a magf object.
-		To generate a field with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas),
-		insert a float equal to delta.		
-	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
-		rotating).  If < 0, code attempts to estimate break-up omega with 
-		self.getomegamax(), if >= 0, uses user defined value.
-	Lwant : wanted angular momentum.
-	mintemp : temperature floor (K), effectively switches from adiabatic 
-		to isothermal profile if reached.
-	composition : "CO", "Mg" or "He" composition.
-	togglecoulomb : includes Coulomb corrections in EOS (corrections are 
-		included even if specific entropy becomes negative).
-	fakeouterpoint : add additional point to profile where M = mass_want to 
-		prevent interpolation attempts from failing.
-	stop_invertererr : stop integrating when EOS error is reached.
-	stop_mrat : stop integrating when integrated M is larger than 
-		stop_mrat*mass.
-	stop_positivepgrad : stop integrating when dP/dr becomes positive.
-	stop_mindenserr : density floor, below which integration is halted.
-		Default is set to 1e-10 to prevent it from ever being reached.  
-		Helmholtz sometimes has trouble below this 1e-8; try adjusting this
-		value to eliminate inverter errors.
-	mass_tol : fractional tolerance between mass wanted and mass produced 
-		by self.getstarmodel()
-	L_tol : fractional tolerance between L wanted and L produced 
-		by self.getrotatingstarmodel()
-	omega_crit_tol : when using the self.getomegamax() iterative finder, 
-		absolute error tolerance for maximum omega.
-	nreps : max number of attempts to find a star in self.getstarmodel().
-	stopcount_max : when self.getstarmodel() detects that wanted mass and 
-					temp_c/S_want combination may not be achievable, number 
-					of stellar integration iterations to take before 
-					testing for global extrema.
-	verbose : report happenings within code.
-
-	Parameters (Unique to mhs_steve)
-	---------------------------------
-	S_want : user-specified central entropy (erg/K)
-	S_old : entropy profile spline (with respect to mass m) of previous star 
-		along runaway track; in cases of extreme convective velocity, switch 
-		to using steve_oS derivative functions when calculated entropy profile 
-		drops below S_old(m).
-	densest : central density initial estimate for self.getstarmodel().
-	omegaest : estimate of rigid rotating angular speed.  Default is False
-		- code wil then use 0.75*mystar.L_want/I.
-	dontintegrate: don't perform any integration
-
-	Returns
-	-------
-	mystar : mhs_steve class instance
-		If star was integrated and data written, results can be found in
-		mystar.data.  Further analysis can be performed with 
-		mystar.getenergies,	mystar.getgradients, mystar.getconvection
-        and mystar.gettimescales.
-
-	Notes
-	-----
-	Additional documentation can be found for specific functions within the
-	class, and in the parent class maghydrostar_core.  The default behaviour 
-    of mhs_steve is to shoot for either a user-specified mass or both a 
-    mass and an angular momentum.  It is possible to define an instance of 
-    mhs_steve and then use integrate_star to	produce profiles of a 
-    known density, central temperature/entropy, and	spin angular velocity 
-    Omega.  Be warned, however, that many of the integration parameters, 
-    including the value of the temperature floor, the types of 
-    superadiabatic temperature gradient deviations used, S_old, and the 
-	pressure and density at which to halt integration, are not automatically 
-    updated.  MAKE SURE these are set when the class instance is declared!  
-    See Examples, below.	
-
-	Examples
-	--------
-	To build a 1.2 Msun star with solid body rotation Omega = 0.3 s^-1:
-	>>> import StarModSteve as SMS
-	>>> mystar = SMS.mhs_steve(1.2*1.9891e33, False, False, 
-	>>>		omega=0.3, temp_c=5e6, verbose=True)
-	The stellar profile can be found under mystar.data, and plotted.  
-	For exmaple:
-	>>> import matplotlib.pyplot as plt
-	>>> plt.plot(mystar.data["R"], mystar.data["rho"], 'r-')
-	>>> plt.xlabel("r (cm)")
-	>>> plt.ylabel(r"$\rho$ (g/cm$^3$)")
-	To generate a series of non-rotating WD profiles with 
-	increasing density, we can use maghydrostar's methods:
-	>>> import StarModSteve as SMS
-	>>> import numpy as np
-	>>> import copy as cp
-	>>> dens_c = 10.**np.arange(8,9,0.1)
-	>>> out_dict = {"dens_c": dens_c,
-	>>>     "M": np.zeros(len(dens_c)),
-	>>>     "stars": []}
-	>>> mystar = SMS.mhs_steve(False, False, False, simd_userot=True, 
-	>>>				verbose=True, stop_mrat=False, dontintegrate=True)
-	>>> for i in range(len(dens_c)):
-	>>>     [Mtot, outerr_code] = mystar.integrate_star(dens_c[i], 0.0, 
-	>>>					temp_c=5e6, recordstar=True, outputerr=True)
-	>>>     out_dict["M"][i] = Mtot
-	>>>     out_dict["stars"].append(cp.deepcopy(mystar.data))
+    sdfsfsfd
 	"""
 
 	def __init__(self, mass, S_want, magprofile=False, omega=0., Lwant=0., 
@@ -204,35 +95,39 @@ class mhs_steve(maghydrostar_core):
 
 		[dens, entropy] = self.getdens_PT(press, temp, failtrig=failtrig)
 
-		Bfld = self.magf.fBfld(R, mass)
-		Pchi = (1./8./np.pi)*Bfld**2
-
 		# Take mag pressure Pchi = 0 for calculating hydro coefficients
-		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s] = self.geteosgradients(dens, temp, 0.0, failtrig=failtrig)
+		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s] = self.geteosgradients(dens, temp, 0., failtrig=failtrig)
 
 		dydx = np.zeros(3)
 		dydx[0] = 1./(4.*np.pi*R**2.*dens)
 		dptotaldm = -self.grav*mass/(4.*np.pi*R**4.) + 1./(6.*np.pi)*omega**2/R
 		dydx[1] = dptotaldm 	#- Pchi_grad*dydx[0]
 
+		if self.nabladev:
+			Bfld = np.sqrt(4.*np.pi*Gamma1*press*self.nabladev/(1. - self.nabladev))
+		else:
+			Bfld = self.magf.fBfld(R, mass)
+		Pchi = (1./8./np.pi)*Bfld**2
+
 		if isotherm:
 
-			hydrograd = 0.		# Zero out hydrograd and deviation; totalgrad then will equal 0.
+			hydrograd = 0.		                                        # Zero out hydrograd and deviation; totalgrad then will equal 0.
 			nabla_terms = {"v_conv_st": 0., "c_s_st": c_s, "nd": 0.}	# Populate deviations as zero
 
 		else:
 
 			nabla_terms = {"c_s_st": c_s}
 
-			agrav_eff = -dptotaldm/dydx[0]/dens		# g_eff = -dP/dr/rho
+			agrav_eff = -dptotaldm/dydx[0]/dens		                    # g_eff = -dP/dr/rho
 			H_P = min(-press*dydx[0]/dptotaldm, (press/self.grav/dens**2)**0.5)	# H_P = min(-P/(dP/dR), sqrt(P/G\rho^2)) (Eggleton 71 approx.)
-			#nabla_terms["c_s_st"] = (agrav_eff*H_P)**0.5					# c_s = sqrt(g*H_P) (Stevenson 79 sentence below Eqn. 37)
+			#nabla_terms["c_s_st"] = (agrav_eff*H_P)**0.5				# c_s = sqrt(g*H_P) (Stevenson 79 sentence below Eqn. 37)
 
 			nabla_terms["v_conv_st"] = (delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
+            nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2
 
 			if omega == 0.:
 				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2
-			else:
+			elif omega > 0.:
 				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])*(2*H_P*omega/nabla_terms["c_s_st"])
 
 		if self.nablarat_crit and (abs(nabla_terms["nd"])/hydrograd > self.nablarat_crit):

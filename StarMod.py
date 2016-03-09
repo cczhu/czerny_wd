@@ -90,20 +90,23 @@ class maghydrostar(maghydrostar_core):
 	mystar : maghydrostar class instance
 		If star was integrated and data written, results can be found in
 		mystar.data.  Further analysis can be performed with 
-		mystar.getenergies,	mystar.getgradients and mystar.getconvection.
+		mystar.getenergies,	mystar.getgradients, mystar.getconvection
+        and mystar.gettimescales.
 
 	Notes
 	-----
 	Additional documentation can be found for specific functions within the
-	class.  The default behaviour of maghydrostar is to shoot for either a 
-	user-specified mass or both a mass and an angular momentum.  It is possible
-	to define an instance of maghydrostar and then use integrate_star to
-	produce profiles of a known density, central temperature/entropy, and
-	spin angular velocity Omega.  Be warned, however, that many of the 
-	integration parameters, including the value of the temperature floor, the
-	types of superadiabatic temperature gradient deviations used, and the 
-	pressure and density at which to halt integration.  MAKE SURE these are set 
-	when the class instance is declared!  See Examples, below.		
+	class, and in the parent class maghydrostar_core.  The default behaviour 
+    of maghydrostar is to shoot for either a user-specified mass or both a 
+    mass and an angular momentum.  It is possible to define an instance of 
+    maghydrostar and then use integrate_star to	produce profiles of a 
+    known density, central temperature/entropy, and	spin angular velocity 
+    Omega.  Be warned, however, that many of the integration parameters, 
+    including the value of the temperature floor, the types of 
+    superadiabatic temperature gradient deviations used, and the 
+	pressure and density at which to halt integration, are not automatically 
+    updated.  MAKE SURE these are set when the class instance is declared!  
+    See Examples, below.
 
 	Examples
 	--------
@@ -121,7 +124,7 @@ class maghydrostar(maghydrostar_core):
 	increasing density, we can use maghydrostar's methods:
 	>>> import StarMod as Star
 	>>> import numpy as np
-	>>> import copy
+	>>> import copy as cp
 	>>> dens_c = 10.**np.arange(8,9,0.1)
 	>>> out_dict = {"dens_c": dens_c,
 	>>>     "M": np.zeros(len(dens_c)),
@@ -224,7 +227,7 @@ class maghydrostar(maghydrostar_core):
 
 		if isotherm:
 
-			hydrograd = 0.		# Zero out hydrograd and deviation; totalgrad then will equal 0.
+			hydrograd = 0.		        # Zero out hydrograd and deviation; totalgrad then will equal 0.
 			deviation = 0.
 
 			if self.simd_usegammavar:	# Populate deviations as zero
