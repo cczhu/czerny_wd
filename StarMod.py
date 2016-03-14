@@ -252,8 +252,8 @@ class maghydrostar(maghydrostar_core):
 				nabla_terms["nd_gamma"] = 1./delta*Bfld**2/(Bfld**2 + 4.*np.pi*Gamma1*press)*nabla_terms["dlngamdlnP"]
 				deviation += nabla_terms["nd_gamma"]
 			if self.simd_usegrav:
-				GH_Poverg = min(press*R**4/(dens*self.grav*mass**2), 1./dens)		# GH_P/g
-				nabla_terms["dlngdlnP"] = -GH_Poverg*(4.*np.pi*dens - 2.*mass/R**3)							# Second term technically becomes NaN, but this function will never see R = 0 or mass = 0
+				GH_Poverg = min(press*R**4/(dens*self.grav*mass**2), 1./dens)			# GH_P/g
+				nabla_terms["dlngdlnP"] = -GH_Poverg*(4.*np.pi*dens - 2.*mass/R**3)		# Second term technically becomes NaN, but this function will never see R = 0 or mass = 0
 				nabla_terms["nd_grav"] = 1./delta*Bfld**2/(4.*np.pi*Gamma1*press)*nabla_terms["dlngdlnP"]
 				deviation -= nabla_terms["nd_grav"]
 

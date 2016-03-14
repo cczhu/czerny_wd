@@ -109,7 +109,7 @@ def make_runaway_steve(whichstarmod="old", starmass=1.2*1.9891e33, mymag=False, 
 
 	# Save a few details about the magnetic field (though we'll need better records for the actual paper)
 	try:
-		mymagsave = np.array([float(mymag.fBfld_r(0)), float(mymag.fBfld_r(5e8))])
+		mymagsave = np.array([float(mymag.fBfld_r(0)), float(mymag.fBfld_r(2e8))])
 	except:
 		if verbose:
 			print "Magnetic field not found!  Hopefully this is what you wanted."
@@ -143,7 +143,7 @@ def make_runaway_steve(whichstarmod="old", starmass=1.2*1.9891e33, mymag=False, 
 	if (omega != 0) or mymag:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
 		mymagzero = magprof.magprofile(None, None, None, None, blankfunc=True)
-		hstar = Star.mhs_steve(r_in["mass"], False, magprofile=mymagzero, omega=0., temp_c=5e6, 
+		hstar = Star.mhs_snd(r_in["mass"], False, magprofile=mymagzero, omega=0., temp_c=5e6, 
 							mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], 
 							mlt_coeff=r_in["mlt_coeff"], P_end_ratio=r_in["P_end_ratio"], 
 							ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], 
@@ -155,7 +155,7 @@ def make_runaway_steve(whichstarmod="old", starmass=1.2*1.9891e33, mymag=False, 
 
 	print "*************Okay, let's make a low-temperature (MHD/rotating) star************"
 	#Rest after this is identical to function call above
-	mystar = Star.mhs_steve(r_in["mass"], False, magprofile=r_in["magprofile"], omega=r_in["omega"], temp_c=5e6,
+	mystar = Star.mhs_snd(r_in["mass"], False, magprofile=mymag, omega=r_in["omega"], temp_c=5e6,
 							mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], 
 							mlt_coeff=r_in["mlt_coeff"], P_end_ratio=r_in["P_end_ratio"], 
 							ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], 

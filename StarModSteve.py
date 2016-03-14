@@ -188,8 +188,8 @@ class mhs_steve(maghydrostar_core):
 				else:
 					self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
 
-		# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
-		assert self.omega >= 0.
+			# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
+			assert self.omega >= 0.
 
 
 	def populateS_old(self, S_old):
@@ -233,11 +233,13 @@ class mhs_steve(maghydrostar_core):
 
 			nabla_terms = {"c_s_st": c_s}
 
-			agrav_eff = -dptotaldm/dydx[0]/dens		# g_eff = -dP/dr/rho
-			H_P = min(-press*dydx[0]/dptotaldm, (press/self.grav/dens**2)**0.5)	# H_P = min(-P/(dP/dR), sqrt(P/G\rho^2)) (Eggleton 71 approx.)
-			#nabla_terms["c_s_st"] = (agrav_eff*H_P)**0.5					# c_s = sqrt(g*H_P) (Stevenson 79 sentence below Eqn. 37)
+#			agrav_eff = -dptotaldm/dydx[0]/dens		# g_eff = -dP/dr/rho
+#			nabla_terms["c_s_st"] = (agrav_eff*H_P)**0.5					# c_s = sqrt(g*H_P) (Stevenson 79 sentence below Eqn. 37)
 
-			nabla_terms["v_conv_st"] = (delta*agrav_eff*H_P/cP/temp*Fconv/dens)**(1./3.)
+			agrav = self.grav*mass/R**2.			# g_eff = Gm/r^2
+			H_P = min(-press*dydx[0]/dptotaldm, (press/self.grav/dens**2)**0.5)	# H_P = min(-P/(dP/dR), sqrt(P/G\rho^2)) (Eggleton 71 approx.)
+
+			nabla_terms["v_conv_st"] = (delta*agrav*H_P/cP/temp*Fconv/dens)**(1./3.)
 
 			if omega == 0.:
 				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2

@@ -963,8 +963,8 @@ class maghydrostar_core():
 		R = np.array(self.data["R"])
 		R[0] = max(1e-30, R[0])
 		dPdr = self.data["dy"][:,1]/self.data["dy"][:,0]
-		self.data["agrav"] = -dPdr/self.data["rho"]			# used to just be self.grav*self.data["M"]/R**2; now this is "agrav_norot" below
-		self.data["agrav_norot"] = self.grav*self.data["M"]/R**2
+		self.data["agrav_effective"] = -dPdr/self.data["rho"]	# used to just be self.grav*self.data["M"]/R**2; now this is "agrav_norot" below
+		self.data["agrav"] = self.grav*self.data["M"]/R**2
 		self.data["H_P"] = -self.data["Pgas"]/dPdr			# Assuming this is the GAS-ONLY SCALE HEIGHT!
 		self.data["H_P"][0] = self.data["H_P"][1]			# Removing singularity at zero
 		HPred = (self.data["Pgas"]/self.grav/self.data["rho"]**2)**0.5	# Reduced version that includes damping of H_P near r = 0; used for nabla calculations in derivatives

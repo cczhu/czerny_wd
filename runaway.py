@@ -92,7 +92,7 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 
 	# Save a few details about the magnetic field (though we'll need better records for the actual paper)
 	try:
-		mymagsave = np.array([float(mymag.fBfld_r(0)), float(mymag.fBfld_r(5e8))])
+		mymagsave = np.array([float(mymag.fBfld_r(0)), float(mymag.fBfld_r(2e8))])
 	except:
 		if verbose:
 			print "Magnetic field not found!  Hopefully this is what you wanted."

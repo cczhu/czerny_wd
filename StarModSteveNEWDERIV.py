@@ -17,15 +17,15 @@ class mhs_snd(mhs_steve):
 
 	def __init__(self, mass, S_want, magprofile=False, omega=0., L_want=0., 
 				temp_c=False, mintemp=1e5, composition="CO", togglecoulomb=True,
-				S_old=False, P_end_ratio=1e-8, ps_eostol=1e-8, 
+				S_old=False, mlt_coeff="phil", P_end_ratio=1e-8, ps_eostol=1e-8, 
 				fakeouterpoint=False, stop_invertererr=True, 
 				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
 				densest=False, omegaest=False, mass_tol=1e-6, L_tol=1e-6, 
-				omega_crit_tol=1e-3, nreps=30, stopcount_max=5, verbose=True):
+				omega_crit_tol=1e-3, nreps=30, stopcount_max=5, dontintegrate=False, verbose=True):
 
 		mhs_steve.__init__(self, mass, S_want, magprofile=magprofile, omega=omega, L_want=L_want, 
 				temp_c=temp_c, mintemp=mintemp, composition=composition, togglecoulomb=togglecoulomb,
-				S_old=S_old, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
+				S_old=S_old, mlt_coeff=mlt_coeff, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
 				fakeouterpoint=fakeouterpoint, stop_invertererr=stop_invertererr, 
 				stop_mrat=stop_mrat, stop_positivepgrad=stop_positivepgrad, stop_mindenserr=stop_mindenserr, 
 				densest=densest, omegaest=omegaest, mass_tol=mass_tol, L_tol=L_tol, 
@@ -34,18 +34,20 @@ class mhs_snd(mhs_steve):
 
 		self.derivatives = self.derivatives_steve
 		self.first_deriv = self.first_derivatives_steve
+		print "NOUVEAU STEVENSON DERIVATIVE SELECTED!"
 
-		if self.omega < 0.:
-			self.omega = 0.
-			self.getmaxomega(P_end_ratio=P_end_ratio, densest=densest, S_want=S_want, ps_eostol=ps_eostol)
-		else:
-			if L_want:
-				self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, damp_nrstep=0.25)
+		if not dontintegrate:
+			if self.omega < 0.:
+				self.omega = 0.
+				self.getmaxomega(P_end_ratio=P_end_ratio, densest=densest, S_want=S_want, ps_eostol=ps_eostol)
 			else:
-				self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
+				if L_want:
+					self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, damp_nrstep=0.25)
+				else:
+					self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
 
-		# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
-		assert self.omega >= 0.
+			# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
+			assert self.omega >= 0.
 
 
 

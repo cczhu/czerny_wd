@@ -126,8 +126,12 @@ def tc_compare_two_tracks(odo, odn, tol=1e-3, m_encr=[0.0,0.9]):
 	print "================ CHECKING RUN_INPUTS ================"
 	mutual_run_inputs = list(set(odo["run_inputs"].keys()) & set(odn["run_inputs"].keys()))
 	for curr_key in mutual_run_inputs:
-		if odo["run_inputs"][curr_key] != odn["run_inputs"][curr_key]:
-			print curr_key, "=", odo["run_inputs"][curr_key], "in odo and =", odn["run_inputs"][curr_key]," in odn"
+		if curr_key == "magprofile" and type(odo["run_inputs"][curr_key]) == np.ndarray:
+			if (odo["run_inputs"][curr_key][0] != odn["run_inputs"][curr_key][0]) or odo["run_inputs"][curr_key][1] != odn["run_inputs"][curr_key][1]:
+				print curr_key, "=", odo["run_inputs"][curr_key], "in odo and =", odn["run_inputs"][curr_key]," in odn"
+		else:
+			if odo["run_inputs"][curr_key] != odn["run_inputs"][curr_key]:
+				print curr_key, "=", odo["run_inputs"][curr_key], "in odo and =", odn["run_inputs"][curr_key]," in odn"
 
 	# Single value comparisons
 	print "================ CHECKING SINGLE VALUES ================"
