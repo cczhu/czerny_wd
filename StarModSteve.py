@@ -30,7 +30,7 @@ class mhs_steve(maghydrostar_core):
 	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
 		rotating).  If < 0, code attempts to estimate break-up omega with 
 		self.getomegamax(), if >= 0, uses user defined value.
-	Lwant : wanted angular momentum.
+	L_want : wanted angular momentum.
 	mintemp : temperature floor (K), effectively switches from adiabatic 
 		to isothermal profile if reached.
 	composition : "CO", "Mg" or "He" composition.
@@ -66,6 +66,15 @@ class mhs_steve(maghydrostar_core):
 		along runaway track; in cases of extreme convective velocity, switch 
 		to using steve_oS derivative functions when calculated entropy profile 
 		drops below S_old(m).
+	mlt_coeff : ["phil", "wwk", "kippw", "steve"]
+		Sets mixing length theory coefficients for calculating velocity 
+		and superadiabatic temperature gradients.  "phil" is the standard 
+		faire coefficients suggested by Phil Chang; "wwk" is back-derived 
+		from Woosley, Wunch and Kuhlen 2004; "kippw" is from 
+		Kippenhahn & Wieigert (identical to Cox & Giuli); "steve" 
+		is from Stevenson 1979.  Since Stevenson's rotational and magnetic
+		corrections to convection are expressed as ratios of velocity and
+		temperature gradient, they can be used with any of these mlt_coeffs.
 	densest : central density initial estimate for self.getstarmodel().
 	omegaest : estimate of rigid rotating angular speed.  Default is False
 		- code wil then use 0.75*mystar.L_want/I.
@@ -124,9 +133,9 @@ class mhs_steve(maghydrostar_core):
 	>>>     out_dict["stars"].append(cp.deepcopy(mystar.data))
 	"""
 
-	def __init__(self, mass, S_want, magprofile=False, omega=0., Lwant=0., 
+	def __init__(self, mass, S_want, magprofile=False, omega=0., L_want=0., 
 				temp_c=False, mintemp=1e5, composition="CO", togglecoulomb=True,
-				S_old=False, P_end_ratio=1e-8, ps_eostol=1e-8, 
+				S_old=False, mlt_coeff="phil", P_end_ratio=1e-8, ps_eostol=1e-8, 
 				fakeouterpoint=False, stop_invertererr=True, 
 				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
 				densest=False, omegaest=False, mass_tol=1e-6, L_tol=1e-6, 
@@ -139,7 +148,7 @@ class mhs_steve(maghydrostar_core):
 			return
 
 		maghydrostar_core.__init__(self, mass, temp_c, magprofile=magprofile, 
-				omega=omega, Lwant=Lwant, mintemp=mintemp,
+				omega=omega, L_want=L_want, mintemp=mintemp,
 				composition=composition, togglecoulomb=togglecoulomb,
 				fakeouterpoint=fakeouterpoint, stop_invertererr=stop_invertererr,
 				stop_mrat=stop_mrat, stop_positivepgrad=stop_positivepgrad, 
@@ -162,8 +171,9 @@ class mhs_steve(maghydrostar_core):
 
 		self.derivatives = self.derivatives_steve
 		self.first_deriv = self.first_derivatives_steve
+		self.set_mlt_coeff(mlt_coeff)
 		if self.verbose:		# self.verbose is implicitly defined in maghydrostar
-			print "Stevenson 79 derivative selected!"
+			print "Stevenson 79 derivative selected!  MLT coefficient = {0:s}".format(mlt_coeff)
 
 		if dontintegrate:
 			if self.verbose:
@@ -173,11 +183,10 @@ class mhs_steve(maghydrostar_core):
 				self.omega = 0.
 				self.getmaxomega(P_end_ratio=P_end_ratio, densest=densest, S_want=S_want, ps_eostol=ps_eostol)
 			else:
-				if Lwant:
-					self.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, damp_nrstep=0.25)
-					#self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, damp_nrstep=0.25)
+				if L_want:
+					self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, damp_nrstep=0.25)
 				else:
-					self.getstarmodel(densest=densest, S_want=S_want)
+					self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
 
 		# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
 		assert self.omega >= 0.
@@ -233,7 +242,7 @@ class mhs_steve(maghydrostar_core):
 			if omega == 0.:
 				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2
 			else:
-				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])*(2*H_P*omega/nabla_terms["c_s_st"])
+				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])*(2.*H_P*omega/nabla_terms["c_s_st"])
 
 		if self.nablarat_crit and (abs(nabla_terms["nd"])/hydrograd > self.nablarat_crit):
 			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
@@ -279,6 +288,32 @@ class mhs_steve(maghydrostar_core):
 		dy_est = np.array([R/M, (P - Pc)/M, (temp - Tc)/M])
 
 		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms, dy_est, isotherm]
+
+
+	def set_mlt_coeff(self, mlt_type):
+		"""Sets MLT coefficients to some variant in literature.
+
+		Parameters
+		----------
+		mlt_type : ["phil", "wwk", "kippw", "steve"]
+					"phil" is the standard faire coefficients suggested by Phil (though probably only used in PC08)
+					"wwk" is back-derived from Woosley, Wunch and Kuhlen 2004
+					"kippw" is from Kippenhahn & Wieigert (identical to Cox & Giuli)
+					"steve" is from Stevenson 1979
+		"""
+
+		if mlt_type == "wwk":
+			self.nab_coeff = 1./2.
+			self.vc_coeff = (4.)**(1./3.)
+		elif mlt_type == "kippw":
+			self.nab_coeff = 8.
+			self.vc_coeff = (1./4)**(1./3.)
+		elif mlt_type == "steve":
+			self.nab_coeff = 25.*np.pi**2/6.
+			self.vc_coeff = (25./4./np.pi*(2./5.)**2.5)**(1./3.)
+		else:
+			self.nab_coeff = 1.
+			self.vc_coeff = 1.
 
 
 	def derivatives_oS(self, y, mass, omega, dens_est, temp_est, failtrig=[-100], ps_eostol=1e-8, m_step=1e29, isotherm=False, grad_full=False):
@@ -719,6 +754,13 @@ class mhs_steve(maghydrostar_core):
 			[adgradred, hydrograd, self.data["nu"][i], self.data["alpha"][i], self.data["delta"][i], self.data["gamma_ad"][i], self.data["cP"][i], cPydro_dumm, c_s_dumm] = self.geteosgradients(self.data["rho"][i], self.data["T"][i], self.data["Pmag"][i])
 			self.data["nabla_ad"][i] = (self.data["Pgas"][i] + self.data["Pmag"][i])/self.data["T"][i]*adgradred
 		self.data["dy"][0] = np.array(self.data["dy"][1])		#derivatives using standard function are undefined at R = 0.
+
+
+	def getconvection_vconv(self):
+		"""overwrite StarModCore/getconvection_vconv
+		"""
+		self.data["vconv"] = self.vc_coeff*(self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
+		self.data["vnuc"] = self.vc_coeff*(self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 
 
 ########################################### BLANK STARMOD FOR POST-PROCESSING #############################################

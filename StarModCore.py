@@ -15,7 +15,7 @@ class maghydrostar_core():
 	of state functions and common post-processing functions.  Parent class of 
 	maghydrostar and mhs_steve; see child class documentation for more details.
 
-	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
+	def __init__(self, mass, temp_c, magprofile=False, omega=0., L_want=0., 
 				mintemp=1e5, composition="CO", togglecoulomb=True,
 				fakeouterpoint=False, stop_invertererr=True, 
 				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
@@ -35,7 +35,7 @@ class maghydrostar_core():
 	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
 		rotating).  If < 0, code attempts to estimate break-up omega with 
 		self.getomegamax(), if >= 0, uses user defined value.
-	Lwant : wanted angular momentum.
+	L_want : wanted angular momentum.
 	mintemp : temperature floor (K), effectively switches from adiabatic 
 		to isothermal profile if reached.
 	composition : "CO", "Mg" or "He" composition.
@@ -69,7 +69,7 @@ class maghydrostar_core():
 	mscore : maghydrostar_core class instance
 	"""
 
-	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
+	def __init__(self, mass, temp_c, magprofile=False, omega=0., L_want=0., 
 				mintemp=1e5, composition="CO", togglecoulomb=True,
 				fakeouterpoint=False, stop_invertererr=True, 
 				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
@@ -83,7 +83,7 @@ class maghydrostar_core():
 		# Stellar properties
 		self.mass_want = mass
 		self.temp_c = temp_c
-		self.L_want = Lwant
+		self.L_want = L_want
 
 		# Integration settings
 		self.stepcoeff = 1e-2
@@ -985,10 +985,16 @@ class maghydrostar_core():
 		self.data["Lconv"][0] = 0.
 		self.data["Fnuc"] = self.data["Lnuc"]/4./np.pi/R**2
 		self.data["Fconv"] = self.data["Lconv"]/4./np.pi/R**2
-		self.data["vconv"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
+		self.getconvection_vconv()
 		self.data["vconv"][0] = max(self.data["vconv"][0], self.data["vconv"][1])
-		self.data["vnuc"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 		self.data["vnuc"][0] = max(self.data["vnuc"][0], self.data["vnuc"][1])
+
+
+	def getconvection_vconv(self):
+		"""subloop of getconvection that calculates the convective and nuclear velocities - can be overridden for custom behaviour (done for mhs_steve)
+		"""
+		self.data["vconv"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
+		self.data["vnuc"] = (self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 
 
 	def gettimescales(self, fresh_calc=False):

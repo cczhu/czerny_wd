@@ -15,24 +15,6 @@ import os, sys
 
 ##################### SUPPORT FUNCTIONS ####################
 
-def tc_get_marten_WD(dens_c, temp_c):
-	""" Obtain WD profile from Marten's HelmholtzWD code.
-	"""
-	os.system("./martenwdmaker/martenwd {0:.6e} {1:.6e} {2:.6e} {3:.6e} > martentemp.txt".format(dens_c, temp_c, 0., 1e5))
-
-	f = open("martentemp.txt", 'r')
-	data2 = np.loadtxt(f, usecols=(0,1,2))
-
-	out = {}
-	out["R"] = data2[:,0]
-	out["dens"] = data2[:,1]
-	out["M"] = data2[:,2]
-	
-	f.close()
-	os.system("rm martentemp.txt")
-
-	return out
-
 
 def tc_recast_array(X, Y, Xr):
 	"""Checks the ratio of two profiles ([X1, Y1] and [X2, Y2]) that have different lengths.
@@ -41,9 +23,36 @@ def tc_recast_array(X, Y, Xr):
 	X/Y: x and y values
 	Xr: rebinned x values
 	"""
-	Ysout = sci_interp.UnivariateSpline(X, Y)
+	Ysout = sci_interp.UnivariateSpline(X, Y, k=1, s=0, ext=3)
 	Yr = Ysout(Xr)
 	return Yr
+
+
+def tc_get_ratio_uneven_arrays(X1, Y1, X2, Y2, returntype=None):
+	"""Checks the ratio of two stellar profiles ([X1, Y1] and [X2, Y2]) that may have different lengths.
+
+	Arguments:
+	X1/Y1: x and y values of profile 1
+	X2/Y2: x and y values of profile 2
+	"""
+	if max(X1) > max(X2):
+		X_spline = X1
+		Y_spline = Y1
+		X_use = X2
+		Y_use = Y2
+	else:
+		X_spline = X2
+		Y_spline = Y2
+		X_use = X1
+		Y_use = Y1
+	Ysout = UnivariateSpline(X_spline, Y_spline, k=1, s=0, ext=3)
+	Y_num = Ysout(X_use)
+	if returntype == "extrema":
+		return [X_use, Y_num/Y_use, max(Y_num/Y_use), min(Y_num/Y_use)]
+	elif returntype == "err":
+		return [X_use, abs(Y_num - Y_use)/Y_use]
+	else:
+		return [X_use, Y_num/Y_use]
 
 
 def tc_checkmodeltol(od):
@@ -84,7 +93,93 @@ def tc_checkmodeltol(od):
 #		if outerr:
 #			print outerr
 
-##################### TEST SUITE ###########################
+def tc_compare_two_models(odod, odnd, tol=1e-3, m_encr=[0.0,0.9], verbose=True):
+	"""Compares two runaway track data dicts (odod and odnd) to determine if they describe the same star to within some tolerance.  All deviations considered are relative and scaled to the value of odn.
+	"""
+
+	critical_profile_vals = ['nabla_mhdr', 'nabla_hydro', 'B', 'Sgas', 'R', 'c_s', 'vnuc', 'T', 'rho', 'Pgas', 'H_Preduced']
+
+	ism_o = min(np.where(odod["M"] > m_encr[0]*odod["M"][-1])[0])
+	ism_n = min(np.where(odnd["M"] > m_encr[0]*odnd["M"][-1])[0])
+	ilg_o = max(np.where(odod["M"] < m_encr[1]*odod["M"][-1])[0]) + 1
+	ilg_n = max(np.where(odnd["M"] < m_encr[1]*odnd["M"][-1])[0]) + 1
+
+	sameflag = True
+
+	for item in critical_profile_vals:
+		y_out = tc_recast_array(odnd["M"][ism_n:ilg_n], odnd[item][ism_n:ilg_n], odod["M"][ism_o:ilg_o])
+		frac_err = abs(y_out - odod[item][ism_o:ilg_o])/odod[item][ism_o:ilg_o]
+		frac_err[np.isnan(frac_err)] = np.nanmean(frac_err)
+		if max(frac_err) > tol:
+			sameflag = False
+			print "\t key = {0:s}, mean(frac_err) = {1:.3e}, max(frac_err) = {2:.3e}".format(item, np.mean(frac_err), max(frac_err))
+
+	if sameflag and verbose:
+		print "Stars are identical to within tolerance!"
+
+
+def tc_compare_two_tracks(odo, odn, tol=1e-3, m_encr=[0.0,0.9]):
+	"""Compares two runaway tracks (odo and odn) to determine if they describe the same runaway to within some tolerance.  All deviations considered are relative and scaled to the value of odn.
+	"""
+
+	# Check run inputs
+	print "================ CHECKING RUN_INPUTS ================"
+	mutual_run_inputs = list(set(odo["run_inputs"].keys()) & set(odn["run_inputs"].keys()))
+	for curr_key in mutual_run_inputs:
+		if odo["run_inputs"][curr_key] != odn["run_inputs"][curr_key]:
+			print curr_key, "=", odo["run_inputs"][curr_key], "in odo and =", odn["run_inputs"][curr_key]," in odn"
+
+	# Single value comparisons
+	print "================ CHECKING SINGLE VALUES ================"
+	critical_values = ['B_c', 'temp_c', 'S_c', 'R', 'dens_c', 'omega']
+	for i in range(len(odo["B_c"])):
+		print "Profile {0:d}".format(i)
+		for item in critical_values:
+			if abs(odo[item][i]) < 1e-30:
+				divisor = 1e-30
+			else:
+				divisor = odo[item][i]
+			comparator = abs(odo[item][i] - odn[item][i])/divisor
+			if comparator > tol:
+				print "\t key = {0:s}, odo = {1:.3e}, odn = {2:.3e}, frac_err = {3:.3e}".format(item, odo[item][i], odn[item][i], comparator)
+		comparator = abs(odo["stars"][i]["R_nuc"] - odn["stars"][i]["R_nuc"])/odo["stars"][i]["R_nuc"]
+		if comparator > tol:
+			print "\t key = {0:s}, odo = {1:.3e}, odn = {2:.3e}, frac_err = {3:.3e}".format("R_nuc", odo["stars"][i]["R_nuc"], odn["stars"][i]["R_nuc"], comparator)
+		comparator = abs(odo["stars"][i]["Lnuc"][-1] - odn["stars"][i]["Lnuc"][-1])/odo["stars"][i]["Lnuc"][-1]
+		if comparator > tol:
+			print "\t key = {0:s}, odo = {1:.3e}, odn = {2:.3e}, frac_err = {3:.3e}".format("R_nuc", odo["stars"][i]["Lnuc"][-1], odn["stars"][i]["Lnuc"][-1], comparator)
+		
+	
+	# Profiles
+	print "================ CHECKING PROFILE VALUES ================"
+	for i in range(len(odo["stars"])):
+		odoi = odo["stars"][i]
+		odni = odn["stars"][i]
+		print "Profile {0:d}".format(i)
+		tc_compare_two_models(odoi, odni, tol=tol, m_encr=m_encr, verbose=False)
+
+
+############## CHECK AGAINST MARTEN'S CODE #################
+
+
+def tc_get_marten_WD(dens_c, temp_c):
+	""" Obtain WD profile from Marten's HelmholtzWD code.
+	"""
+	os.system("./martenwdmaker/martenwd {0:.6e} {1:.6e} {2:.6e} {3:.6e} > martentemp.txt".format(dens_c, temp_c, 0., 1e5))
+
+	f = open("martentemp.txt", 'r')
+	data2 = np.loadtxt(f, usecols=(0,1,2))
+
+	out = {}
+	out["R"] = data2[:,0]
+	out["dens"] = data2[:,1]
+	out["M"] = data2[:,2]
+	
+	f.close()
+	os.system("rm martentemp.txt")
+
+	return out
+
 
 def tc_check_vs_marten_loop_element(ods, tol=1e-2, cutoff_mass=0.9):
 	"""Checks data instance against Marten's code.
@@ -113,6 +208,17 @@ def tc_check_vs_marten(od, tol=1e-3):
 		tc_check_vs_marten_loop_element(od["stars"][i], tol=tol)
 
 
+######### CHECK SUPERADIABATICITY SELF-CONSISTENCY #########
+
+
+def recalc_nd():
+
+	print "NOT THERE YET"
+
+
+##################### TEST SUITE ###########################
+
+
 def tc_run_suite():
 	"""Runs suite of tests to check overall state of code.
 	"""
@@ -120,8 +226,9 @@ def tc_run_suite():
 	###### RUN MARTEN CODE COMPARISON ####
 	# Set M = 1.15 Msun
 	# Coulomb = off
-
 	static_S = [1e7,2e7,3e7,4e7,5e7] + list(10.**arange(np.log10(6e7), np.log10(2.2e8*1.01), 0.005))
 	od = rw.make_runaway(starmass=1.15*1.9891e33, mymag=False, omega=0., S_arr=static_S, mintemp=1e5, tog_coul=False, stop_mindenserr=1e-10, mass_tol=1e-6, P_end_ratio=1e-8, simd_userot=False, simd_usegammavar=False, simd_usegrav=False, simd_suppress=False, verbose=True)
 
 	tc_check_vs_marten(od)
+
+	###### CHECK DERIVATIVES ############

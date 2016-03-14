@@ -33,7 +33,7 @@ class maghydrostar(maghydrostar_core):
 	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
 		rotating).  If < 0, code attempts to estimate break-up omega with 
 		self.getomegamax(), if >= 0, uses user defined value.
-	Lwant : wanted angular momentum.
+	L_want : wanted angular momentum.
 	mintemp : temperature floor (K), effectively switches from adiabatic 
 		to isothermal profile if reached.
 	composition : "CO", "Mg" or "He" composition.
@@ -138,7 +138,7 @@ class maghydrostar(maghydrostar_core):
 	>>>     out_dict["stars"].append(cp.deepcopy(mystar.data))
 	"""
 
-	def __init__(self, mass, temp_c, magprofile=False, omega=0., Lwant=0., 
+	def __init__(self, mass, temp_c, magprofile=False, omega=0., L_want=0., 
 				S_want=False, mintemp=1e5, composition="CO", togglecoulomb=True,
 				simd_userot=True, simd_usegammavar=False, simd_usegrav=False, 
 				simd_suppress=False, P_end_ratio=1e-8, ps_eostol=1e-8, 
@@ -149,7 +149,7 @@ class maghydrostar(maghydrostar_core):
 				dontintegrate=False, verbose=True):
 
 		maghydrostar_core.__init__(self, mass, temp_c, magprofile=magprofile, 
-				omega=omega, Lwant=Lwant, mintemp=mintemp,
+				omega=omega, L_want=L_want, mintemp=mintemp,
 				composition=composition, togglecoulomb=togglecoulomb,
 				fakeouterpoint=fakeouterpoint, stop_invertererr=stop_invertererr,
 				stop_mrat=stop_mrat, stop_positivepgrad=stop_positivepgrad, 
@@ -187,7 +187,7 @@ class maghydrostar(maghydrostar_core):
 				self.omega = 0.
 				self.getmaxomega(P_end_ratio=P_end_ratio, densest=densest, S_want=S_want, ps_eostol=ps_eostol)
 			else:
-				if Lwant:
+				if L_want:
 					self.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, damp_nrstep=0.25)
 				else:
 					self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
@@ -276,7 +276,10 @@ class maghydrostar(maghydrostar_core):
 
 
 	def first_derivatives_gtsh(self, dens, M, Pc, Tc, omega, failtrig=[-100]):
-		"""First step to take for self.derivatives_gtsh()
+		"""
+		First step to take for self.derivatives_gtsh().   R, P, temp are at r = R,
+		while hydrograd, totalgrad, nabla_terms are derivative and magnetic field values
+		for r = 0.
 		"""
 
 		R = (3.*M/(4.*np.pi*dens))**(1./3.)
@@ -336,6 +339,8 @@ class maghydrostar(maghydrostar_core):
 		else:
 			isotherm = False
 
+		# Since this code is both derivative and integrator, R, P and temp are integrated values at r = R, while
+		# Bfld...nabla_terms are derivative and associated values at r = 0.
 		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms, isotherm]
 
 

@@ -1,0 +1,657 @@
+================ CHECKING RUN_INPUTS ================
+mintemp = 10000.0 in odo and = 100000.0  in odn
+================ CHECKING SINGLE VALUES ================
+Profile 0
+Profile 1
+Profile 2
+Profile 3
+Profile 4
+Profile 5
+Profile 6
+Profile 7
+Profile 8
+Profile 9
+Profile 10
+Profile 11
+Profile 12
+Profile 13
+Profile 14
+Profile 15
+Profile 16
+Profile 17
+Profile 18
+Profile 19
+Profile 20
+Profile 21
+Profile 22
+Profile 23
+Profile 24
+Profile 25
+Profile 26
+Profile 27
+Profile 28
+Profile 29
+Profile 30
+Profile 31
+Profile 32
+Profile 33
+Profile 34
+Profile 35
+Profile 36
+Profile 37
+Profile 38
+Profile 39
+Profile 40
+Profile 41
+Profile 42
+Profile 43
+Profile 44
+Profile 45
+Profile 46
+Profile 47
+Profile 48
+Profile 49
+Profile 50
+Profile 51
+Profile 52
+Profile 53
+Profile 54
+Profile 55
+Profile 56
+Profile 57
+Profile 58
+Profile 59
+Profile 60
+Profile 61
+Profile 62
+Profile 63
+Profile 64
+Profile 65
+Profile 66
+Profile 67
+Profile 68
+Profile 69
+Profile 70
+Profile 71
+Profile 72
+Profile 73
+Profile 74
+Profile 75
+Profile 76
+Profile 77
+Profile 78
+Profile 79
+Profile 80
+Profile 81
+Profile 82
+Profile 83
+Profile 84
+Profile 85
+Profile 86
+Profile 87
+	 key = R, odo = 7.830e+08, odn = 7.817e+08, frac_err = 1.691e-03
+Profile 88
+	 key = R, odo = 7.988e+08, odn = 7.975e+08, frac_err = 1.678e-03
+Profile 89
+	 key = R, odo = 8.153e+08, odn = 8.139e+08, frac_err = 1.665e-03
+Profile 90
+	 key = R, odo = 8.324e+08, odn = 8.311e+08, frac_err = 1.652e-03
+Profile 91
+	 key = R, odo = 8.504e+08, odn = 8.490e+08, frac_err = 1.640e-03
+Profile 92
+	 key = R, odo = 8.690e+08, odn = 8.676e+08, frac_err = 1.627e-03
+Profile 93
+	 key = R, odo = 8.885e+08, odn = 8.871e+08, frac_err = 1.615e-03
+Profile 94
+	 key = R, odo = 9.088e+08, odn = 9.074e+08, frac_err = 1.603e-03
+Profile 95
+	 key = R, odo = 9.300e+08, odn = 9.286e+08, frac_err = 1.591e-03
+Profile 96
+	 key = R, odo = 9.522e+08, odn = 9.507e+08, frac_err = 1.579e-03
+Profile 97
+	 key = R, odo = 9.753e+08, odn = 9.738e+08, frac_err = 1.568e-03
+Profile 98
+	 key = R, odo = 9.994e+08, odn = 9.979e+08, frac_err = 1.556e-03
+Profile 99
+	 key = R, odo = 1.025e+09, odn = 1.023e+09, frac_err = 1.545e-03
+Profile 100
+	 key = R, odo = 1.051e+09, odn = 1.049e+09, frac_err = 1.534e-03
+Profile 101
+	 key = R, odo = 1.078e+09, odn = 1.077e+09, frac_err = 1.527e-03
+Profile 102
+	 key = R, odo = 1.107e+09, odn = 1.106e+09, frac_err = 1.516e-03
+Profile 103
+	 key = R, odo = 1.137e+09, odn = 1.136e+09, frac_err = 1.495e-03
+Profile 104
+	 key = R, odo = 1.169e+09, odn = 1.167e+09, frac_err = 1.485e-03
+Profile 105
+	 key = R, odo = 1.202e+09, odn = 1.200e+09, frac_err = 1.475e-03
+Profile 106
+	 key = R, odo = 1.236e+09, odn = 1.234e+09, frac_err = 1.465e-03
+Profile 107
+	 key = R, odo = 1.272e+09, odn = 1.270e+09, frac_err = 1.455e-03
+Profile 108
+	 key = R, odo = 1.310e+09, odn = 1.308e+09, frac_err = 1.446e-03
+Profile 109
+	 key = R, odo = 1.349e+09, odn = 1.347e+09, frac_err = 1.437e-03
+Profile 110
+	 key = R, odo = 1.391e+09, odn = 1.389e+09, frac_err = 1.427e-03
+Profile 111
+	 key = R, odo = 1.434e+09, odn = 1.432e+09, frac_err = 1.418e-03
+Profile 112
+	 key = R, odo = 1.479e+09, odn = 1.477e+09, frac_err = 1.410e-03
+Profile 113
+	 key = R, odo = 1.527e+09, odn = 1.525e+09, frac_err = 1.401e-03
+Profile 114
+	 key = R, odo = 1.577e+09, odn = 1.569e+09, frac_err = 5.133e-03
+Profile 115
+	 key = R, odo = 1.629e+09, odn = 1.621e+09, frac_err = 5.104e-03
+Profile 116
+	 key = R, odo = 1.684e+09, odn = 1.676e+09, frac_err = 5.076e-03
+Profile 117
+	 key = R, odo = 1.742e+09, odn = 1.733e+09, frac_err = 5.048e-03
+Profile 118
+	 key = R, odo = 1.803e+09, odn = 1.794e+09, frac_err = 5.021e-03
+Profile 119
+	 key = R, odo = 1.866e+09, odn = 1.857e+09, frac_err = 4.994e-03
+================ CHECKING PROFILE VALUES ================
+Profile 0
+	 key = nabla_mhdr, mean(frac_err) = 2.078e-01, max(frac_err) = 1.000e+00
+	 key = nabla_hydro, mean(frac_err) = 2.078e-01, max(frac_err) = 1.000e+00
+	 key = c_s, mean(frac_err) = 3.059e-04, max(frac_err) = 7.528e-03
+	 key = vnuc, mean(frac_err) = 2.940e-03, max(frac_err) = 3.433e-02
+	 key = T, mean(frac_err) = 2.023e-01, max(frac_err) = 2.399e+00
+	 key = rho, mean(frac_err) = 1.121e-03, max(frac_err) = 2.405e-02
+	 key = Pgas, mean(frac_err) = 1.704e-03, max(frac_err) = 3.870e-02
+	 key = H_Preduced, mean(frac_err) = 5.883e-04, max(frac_err) = 1.496e-02
+Profile 1
+	 key = nabla_mhdr, mean(frac_err) = 1.398e-01, max(frac_err) = 1.000e+00
+	 key = nabla_hydro, mean(frac_err) = 1.398e-01, max(frac_err) = 1.000e+00
+	 key = Sgas, mean(frac_err) = 1.627e-01, max(frac_err) = 2.282e+00
+	 key = c_s, mean(frac_err) = 2.958e-04, max(frac_err) = 7.026e-03
+	 key = vnuc, mean(frac_err) = 1.577e-03, max(frac_err) = 2.599e-02
+	 key = T, mean(frac_err) = 7.909e-02, max(frac_err) = 1.300e+00
+	 key = rho, mean(frac_err) = 9.808e-04, max(frac_err) = 2.188e-02
+	 key = Pgas, mean(frac_err) = 1.559e-03, max(frac_err) = 3.567e-02
+	 key = H_Preduced, mean(frac_err) = 5.832e-04, max(frac_err) = 1.406e-02
+Profile 2
+	 key = nabla_mhdr, mean(frac_err) = 7.995e-02, max(frac_err) = 1.000e+00
+	 key = nabla_hydro, mean(frac_err) = 7.995e-02, max(frac_err) = 1.000e+00
+	 key = Sgas, mean(frac_err) = 2.584e-02, max(frac_err) = 6.381e-01
+	 key = c_s, mean(frac_err) = 1.222e-04, max(frac_err) = 2.952e-03
+	 key = vnuc, mean(frac_err) = 3.871e-04, max(frac_err) = 9.452e-03
+	 key = T, mean(frac_err) = 2.313e-02, max(frac_err) = 6.219e-01
+	 key = rho, mean(frac_err) = 2.570e-04, max(frac_err) = 5.643e-03
+	 key = Pgas, mean(frac_err) = 5.208e-04, max(frac_err) = 1.213e-02
+	 key = H_Preduced, mean(frac_err) = 2.614e-04, max(frac_err) = 6.433e-03
+Profile 3
+	 key = nabla_mhdr, mean(frac_err) = 1.870e-02, max(frac_err) = 1.000e+00
+	 key = nabla_hydro, mean(frac_err) = 1.870e-02, max(frac_err) = 1.000e+00
+	 key = Sgas, mean(frac_err) = 9.114e-04, max(frac_err) = 9.684e-02
+	 key = vnuc, mean(frac_err) = 4.911e-05, max(frac_err) = 3.327e-03
+	 key = T, mean(frac_err) = 1.112e-03, max(frac_err) = 1.187e-01
+	 key = rho, mean(frac_err) = 7.153e-05, max(frac_err) = 1.871e-03
+	 key = Pgas, mean(frac_err) = 1.205e-04, max(frac_err) = 2.780e-03
+Profile 4
+	 key = c_s, mean(frac_err) = 5.940e-05, max(frac_err) = 1.397e-03
+	 key = vnuc, mean(frac_err) = 5.226e-05, max(frac_err) = 1.195e-03
+	 key = T, mean(frac_err) = 7.754e-05, max(frac_err) = 1.777e-03
+	 key = rho, mean(frac_err) = 1.624e-04, max(frac_err) = 3.730e-03
+	 key = Pgas, mean(frac_err) = 2.859e-04, max(frac_err) = 6.656e-03
+	 key = H_Preduced, mean(frac_err) = 1.221e-04, max(frac_err) = 2.901e-03
+Profile 5
+	 key = c_s, mean(frac_err) = 8.758e-05, max(frac_err) = 2.060e-03
+	 key = vnuc, mean(frac_err) = 7.705e-05, max(frac_err) = 1.762e-03
+	 key = T, mean(frac_err) = 1.185e-04, max(frac_err) = 2.716e-03
+	 key = rho, mean(frac_err) = 2.395e-04, max(frac_err) = 5.502e-03
+	 key = Pgas, mean(frac_err) = 4.215e-04, max(frac_err) = 9.816e-03
+	 key = H_Preduced, mean(frac_err) = 1.801e-04, max(frac_err) = 4.277e-03
+Profile 6
+	 key = c_s, mean(frac_err) = 5.255e-05, max(frac_err) = 1.236e-03
+	 key = vnuc, mean(frac_err) = 4.643e-05, max(frac_err) = 1.062e-03
+	 key = T, mean(frac_err) = 7.402e-05, max(frac_err) = 1.697e-03
+	 key = rho, mean(frac_err) = 1.432e-04, max(frac_err) = 3.290e-03
+	 key = Pgas, mean(frac_err) = 2.509e-04, max(frac_err) = 5.844e-03
+	 key = H_Preduced, mean(frac_err) = 1.078e-04, max(frac_err) = 2.561e-03
+Profile 7
+	 key = rho, mean(frac_err) = 7.022e-05, max(frac_err) = 1.613e-03
+	 key = Pgas, mean(frac_err) = 1.230e-04, max(frac_err) = 2.865e-03
+	 key = H_Preduced, mean(frac_err) = 5.286e-05, max(frac_err) = 1.255e-03
+Profile 8
+	 key = rho, mean(frac_err) = 4.810e-05, max(frac_err) = 1.105e-03
+	 key = Pgas, mean(frac_err) = 8.465e-05, max(frac_err) = 1.971e-03
+Profile 9
+	 key = rho, mean(frac_err) = 7.491e-05, max(frac_err) = 1.721e-03
+	 key = Pgas, mean(frac_err) = 1.313e-04, max(frac_err) = 3.057e-03
+	 key = H_Preduced, mean(frac_err) = 5.639e-05, max(frac_err) = 1.339e-03
+Profile 10
+Profile 11
+	 key = rho, mean(frac_err) = 6.779e-05, max(frac_err) = 1.558e-03
+	 key = Pgas, mean(frac_err) = 1.188e-04, max(frac_err) = 2.766e-03
+	 key = H_Preduced, mean(frac_err) = 5.103e-05, max(frac_err) = 1.212e-03
+Profile 12
+	 key = rho, mean(frac_err) = 5.657e-05, max(frac_err) = 1.300e-03
+	 key = Pgas, mean(frac_err) = 9.913e-05, max(frac_err) = 2.309e-03
+	 key = H_Preduced, mean(frac_err) = 4.259e-05, max(frac_err) = 1.012e-03
+Profile 13
+Profile 14
+Profile 15
+	 key = rho, mean(frac_err) = 7.109e-05, max(frac_err) = 1.634e-03
+	 key = Pgas, mean(frac_err) = 1.246e-04, max(frac_err) = 2.901e-03
+	 key = H_Preduced, mean(frac_err) = 5.352e-05, max(frac_err) = 1.271e-03
+Profile 16
+	 key = Pgas, mean(frac_err) = 4.672e-05, max(frac_err) = 1.088e-03
+Profile 17
+	 key = rho, mean(frac_err) = 6.713e-05, max(frac_err) = 1.542e-03
+	 key = Pgas, mean(frac_err) = 1.181e-04, max(frac_err) = 2.751e-03
+	 key = H_Preduced, mean(frac_err) = 5.046e-05, max(frac_err) = 1.199e-03
+Profile 18
+Profile 19
+Profile 20
+Profile 21
+	 key = Pgas, mean(frac_err) = 4.518e-05, max(frac_err) = 1.052e-03
+Profile 22
+	 key = Pgas, mean(frac_err) = 4.675e-05, max(frac_err) = 1.089e-03
+Profile 23
+	 key = Pgas, mean(frac_err) = 4.932e-05, max(frac_err) = 1.148e-03
+Profile 24
+Profile 25
+	 key = rho, mean(frac_err) = 5.077e-05, max(frac_err) = 1.166e-03
+	 key = Pgas, mean(frac_err) = 8.936e-05, max(frac_err) = 2.081e-03
+Profile 26
+	 key = rho, mean(frac_err) = 5.210e-05, max(frac_err) = 1.197e-03
+	 key = Pgas, mean(frac_err) = 9.170e-05, max(frac_err) = 2.136e-03
+Profile 27
+Profile 28
+	 key = Pgas, mean(frac_err) = 7.001e-05, max(frac_err) = 1.631e-03
+Profile 29
+	 key = rho, mean(frac_err) = 4.761e-05, max(frac_err) = 1.094e-03
+	 key = Pgas, mean(frac_err) = 8.344e-05, max(frac_err) = 1.943e-03
+Profile 30
+Profile 31
+Profile 32
+Profile 33
+Profile 34
+	 key = Pgas, mean(frac_err) = 4.310e-05, max(frac_err) = 1.004e-03
+Profile 35
+Profile 36
+Profile 37
+Profile 38
+Profile 39
+Profile 40
+Profile 41
+Profile 42
+Profile 43
+Profile 44
+Profile 45
+Profile 46
+Profile 47
+Profile 48
+Profile 49
+Profile 50
+Profile 51
+Profile 52
+Profile 53
+Profile 54
+Profile 55
+Profile 56
+Profile 57
+Profile 58
+Profile 59
+Profile 60
+Profile 61
+Profile 62
+Profile 63
+Profile 64
+Profile 65
+Profile 66
+Profile 67
+Profile 68
+Profile 69
+Profile 70
+Profile 71
+Profile 72
+Profile 73
+Profile 74
+Profile 75
+Profile 76
+Profile 77
+Profile 78
+Profile 79
+Profile 80
+Profile 81
+Profile 82
+Profile 83
+Profile 84
+Profile 85
+Profile 86
+Profile 87
+	 key = nabla_mhdr, mean(frac_err) = 2.572e-03, max(frac_err) = 4.421e-02
+	 key = nabla_hydro, mean(frac_err) = 2.572e-03, max(frac_err) = 4.421e-02
+	 key = R, mean(frac_err) = 1.988e-04, max(frac_err) = 1.698e-03
+	 key = c_s, mean(frac_err) = 4.034e-02, max(frac_err) = 6.212e-01
+	 key = vnuc, mean(frac_err) = 2.754e-02, max(frac_err) = 3.407e-01
+	 key = T, mean(frac_err) = 7.982e-02, max(frac_err) = 1.300e+00
+	 key = rho, mean(frac_err) = 1.459e-01, max(frac_err) = 2.657e+00
+	 key = Pgas, mean(frac_err) = 3.810e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.817e-02, max(frac_err) = 1.722e+00
+Profile 88
+	 key = nabla_mhdr, mean(frac_err) = 2.586e-03, max(frac_err) = 4.449e-02
+	 key = nabla_hydro, mean(frac_err) = 2.586e-03, max(frac_err) = 4.449e-02
+	 key = R, mean(frac_err) = 1.973e-04, max(frac_err) = 1.685e-03
+	 key = c_s, mean(frac_err) = 4.035e-02, max(frac_err) = 6.214e-01
+	 key = vnuc, mean(frac_err) = 2.753e-02, max(frac_err) = 3.406e-01
+	 key = T, mean(frac_err) = 7.985e-02, max(frac_err) = 1.301e+00
+	 key = rho, mean(frac_err) = 1.459e-01, max(frac_err) = 2.655e+00
+	 key = Pgas, mean(frac_err) = 3.810e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.824e-02, max(frac_err) = 1.724e+00
+Profile 89
+	 key = nabla_mhdr, mean(frac_err) = 2.599e-03, max(frac_err) = 4.475e-02
+	 key = nabla_hydro, mean(frac_err) = 2.599e-03, max(frac_err) = 4.475e-02
+	 key = R, mean(frac_err) = 1.957e-04, max(frac_err) = 1.672e-03
+	 key = c_s, mean(frac_err) = 4.035e-02, max(frac_err) = 6.216e-01
+	 key = vnuc, mean(frac_err) = 2.751e-02, max(frac_err) = 3.404e-01
+	 key = T, mean(frac_err) = 7.984e-02, max(frac_err) = 1.301e+00
+	 key = rho, mean(frac_err) = 1.457e-01, max(frac_err) = 2.653e+00
+	 key = Pgas, mean(frac_err) = 3.808e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.826e-02, max(frac_err) = 1.725e+00
+Profile 90
+	 key = nabla_mhdr, mean(frac_err) = 2.613e-03, max(frac_err) = 4.499e-02
+	 key = nabla_hydro, mean(frac_err) = 2.613e-03, max(frac_err) = 4.499e-02
+	 key = R, mean(frac_err) = 1.943e-04, max(frac_err) = 1.659e-03
+	 key = c_s, mean(frac_err) = 4.037e-02, max(frac_err) = 6.218e-01
+	 key = vnuc, mean(frac_err) = 2.751e-02, max(frac_err) = 3.403e-01
+	 key = T, mean(frac_err) = 7.990e-02, max(frac_err) = 1.301e+00
+	 key = rho, mean(frac_err) = 1.457e-01, max(frac_err) = 2.651e+00
+	 key = Pgas, mean(frac_err) = 3.810e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.836e-02, max(frac_err) = 1.727e+00
+Profile 91
+	 key = nabla_mhdr, mean(frac_err) = 2.627e-03, max(frac_err) = 4.527e-02
+	 key = nabla_hydro, mean(frac_err) = 2.627e-03, max(frac_err) = 4.527e-02
+	 key = R, mean(frac_err) = 1.928e-04, max(frac_err) = 1.647e-03
+	 key = c_s, mean(frac_err) = 4.038e-02, max(frac_err) = 6.220e-01
+	 key = vnuc, mean(frac_err) = 2.750e-02, max(frac_err) = 3.401e-01
+	 key = T, mean(frac_err) = 7.992e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.456e-01, max(frac_err) = 2.649e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.842e-02, max(frac_err) = 1.728e+00
+Profile 92
+	 key = nabla_mhdr, mean(frac_err) = 2.642e-03, max(frac_err) = 4.556e-02
+	 key = nabla_hydro, mean(frac_err) = 2.642e-03, max(frac_err) = 4.556e-02
+	 key = R, mean(frac_err) = 1.914e-04, max(frac_err) = 1.634e-03
+	 key = c_s, mean(frac_err) = 4.039e-02, max(frac_err) = 6.222e-01
+	 key = vnuc, mean(frac_err) = 2.748e-02, max(frac_err) = 3.399e-01
+	 key = T, mean(frac_err) = 7.994e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.455e-01, max(frac_err) = 2.647e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.848e-02, max(frac_err) = 1.730e+00
+Profile 93
+	 key = nabla_mhdr, mean(frac_err) = 2.656e-03, max(frac_err) = 4.582e-02
+	 key = nabla_hydro, mean(frac_err) = 2.656e-03, max(frac_err) = 4.582e-02
+	 key = R, mean(frac_err) = 1.899e-04, max(frac_err) = 1.622e-03
+	 key = c_s, mean(frac_err) = 4.040e-02, max(frac_err) = 6.224e-01
+	 key = vnuc, mean(frac_err) = 2.747e-02, max(frac_err) = 3.397e-01
+	 key = T, mean(frac_err) = 7.995e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.455e-01, max(frac_err) = 2.646e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.855e-02, max(frac_err) = 1.731e+00
+Profile 94
+	 key = nabla_mhdr, mean(frac_err) = 2.671e-03, max(frac_err) = 4.609e-02
+	 key = nabla_hydro, mean(frac_err) = 2.671e-03, max(frac_err) = 4.609e-02
+	 key = R, mean(frac_err) = 1.885e-04, max(frac_err) = 1.610e-03
+	 key = c_s, mean(frac_err) = 4.041e-02, max(frac_err) = 6.226e-01
+	 key = vnuc, mean(frac_err) = 2.746e-02, max(frac_err) = 3.396e-01
+	 key = T, mean(frac_err) = 7.997e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.454e-01, max(frac_err) = 2.644e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.861e-02, max(frac_err) = 1.733e+00
+Profile 95
+	 key = nabla_mhdr, mean(frac_err) = 2.686e-03, max(frac_err) = 4.639e-02
+	 key = nabla_hydro, mean(frac_err) = 2.686e-03, max(frac_err) = 4.639e-02
+	 key = R, mean(frac_err) = 1.871e-04, max(frac_err) = 1.598e-03
+	 key = c_s, mean(frac_err) = 4.042e-02, max(frac_err) = 6.228e-01
+	 key = vnuc, mean(frac_err) = 2.745e-02, max(frac_err) = 3.394e-01
+	 key = T, mean(frac_err) = 7.998e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.453e-01, max(frac_err) = 2.642e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.867e-02, max(frac_err) = 1.734e+00
+Profile 96
+	 key = nabla_mhdr, mean(frac_err) = 2.701e-03, max(frac_err) = 4.666e-02
+	 key = nabla_hydro, mean(frac_err) = 2.701e-03, max(frac_err) = 4.666e-02
+	 key = R, mean(frac_err) = 1.858e-04, max(frac_err) = 1.586e-03
+	 key = c_s, mean(frac_err) = 4.043e-02, max(frac_err) = 6.230e-01
+	 key = vnuc, mean(frac_err) = 2.744e-02, max(frac_err) = 3.392e-01
+	 key = T, mean(frac_err) = 7.999e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.452e-01, max(frac_err) = 2.640e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.874e-02, max(frac_err) = 1.736e+00
+Profile 97
+	 key = nabla_mhdr, mean(frac_err) = 2.716e-03, max(frac_err) = 4.693e-02
+	 key = nabla_hydro, mean(frac_err) = 2.716e-03, max(frac_err) = 4.693e-02
+	 key = R, mean(frac_err) = 1.844e-04, max(frac_err) = 1.575e-03
+	 key = c_s, mean(frac_err) = 4.044e-02, max(frac_err) = 6.232e-01
+	 key = vnuc, mean(frac_err) = 2.743e-02, max(frac_err) = 3.391e-01
+	 key = T, mean(frac_err) = 7.999e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.452e-01, max(frac_err) = 2.638e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.880e-02, max(frac_err) = 1.737e+00
+Profile 98
+	 key = nabla_mhdr, mean(frac_err) = 2.731e-03, max(frac_err) = 4.724e-02
+	 key = nabla_hydro, mean(frac_err) = 2.731e-03, max(frac_err) = 4.724e-02
+	 key = R, mean(frac_err) = 1.831e-04, max(frac_err) = 1.563e-03
+	 key = c_s, mean(frac_err) = 4.045e-02, max(frac_err) = 6.234e-01
+	 key = vnuc, mean(frac_err) = 2.742e-02, max(frac_err) = 3.389e-01
+	 key = T, mean(frac_err) = 8.000e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.451e-01, max(frac_err) = 2.636e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.887e-02, max(frac_err) = 1.739e+00
+Profile 99
+	 key = nabla_mhdr, mean(frac_err) = 2.747e-03, max(frac_err) = 4.753e-02
+	 key = nabla_hydro, mean(frac_err) = 2.747e-03, max(frac_err) = 4.753e-02
+	 key = R, mean(frac_err) = 1.818e-04, max(frac_err) = 1.552e-03
+	 key = c_s, mean(frac_err) = 4.046e-02, max(frac_err) = 6.236e-01
+	 key = vnuc, mean(frac_err) = 2.740e-02, max(frac_err) = 3.387e-01
+	 key = T, mean(frac_err) = 8.000e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.450e-01, max(frac_err) = 2.634e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.893e-02, max(frac_err) = 1.741e+00
+Profile 100
+	 key = nabla_mhdr, mean(frac_err) = 2.763e-03, max(frac_err) = 4.781e-02
+	 key = nabla_hydro, mean(frac_err) = 2.763e-03, max(frac_err) = 4.781e-02
+	 key = R, mean(frac_err) = 1.805e-04, max(frac_err) = 1.541e-03
+	 key = c_s, mean(frac_err) = 4.047e-02, max(frac_err) = 6.238e-01
+	 key = vnuc, mean(frac_err) = 2.739e-02, max(frac_err) = 3.385e-01
+	 key = T, mean(frac_err) = 8.000e-02, max(frac_err) = 1.302e+00
+	 key = rho, mean(frac_err) = 1.449e-01, max(frac_err) = 2.632e+00
+	 key = Pgas, mean(frac_err) = 3.809e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.899e-02, max(frac_err) = 1.742e+00
+Profile 101
+	 key = nabla_mhdr, mean(frac_err) = 2.799e-03, max(frac_err) = 4.842e-02
+	 key = nabla_hydro, mean(frac_err) = 2.799e-03, max(frac_err) = 4.842e-02
+	 key = R, mean(frac_err) = 1.800e-04, max(frac_err) = 1.534e-03
+	 key = c_s, mean(frac_err) = 4.076e-02, max(frac_err) = 6.275e-01
+	 key = vnuc, mean(frac_err) = 2.753e-02, max(frac_err) = 3.395e-01
+	 key = T, mean(frac_err) = 8.059e-02, max(frac_err) = 1.310e+00
+	 key = rho, mean(frac_err) = 1.460e-01, max(frac_err) = 2.650e+00
+	 key = Pgas, mean(frac_err) = 3.850e-01, max(frac_err) = 9.090e+00
+	 key = H_Preduced, mean(frac_err) = 9.984e-02, max(frac_err) = 1.756e+00
+Profile 102
+	 key = nabla_mhdr, mean(frac_err) = 2.816e-03, max(frac_err) = 4.872e-02
+	 key = nabla_hydro, mean(frac_err) = 2.816e-03, max(frac_err) = 4.872e-02
+	 key = R, mean(frac_err) = 1.787e-04, max(frac_err) = 1.523e-03
+	 key = c_s, mean(frac_err) = 4.077e-02, max(frac_err) = 6.277e-01
+	 key = vnuc, mean(frac_err) = 2.752e-02, max(frac_err) = 3.393e-01
+	 key = T, mean(frac_err) = 8.059e-02, max(frac_err) = 1.310e+00
+	 key = rho, mean(frac_err) = 1.460e-01, max(frac_err) = 2.648e+00
+	 key = Pgas, mean(frac_err) = 3.850e-01, max(frac_err) = 9.090e+00
+	 key = H_Preduced, mean(frac_err) = 9.991e-02, max(frac_err) = 1.758e+00
+Profile 103
+	 key = nabla_mhdr, mean(frac_err) = 2.817e-03, max(frac_err) = 4.884e-02
+	 key = nabla_hydro, mean(frac_err) = 2.817e-03, max(frac_err) = 4.884e-02
+	 key = R, mean(frac_err) = 1.759e-04, max(frac_err) = 1.502e-03
+	 key = c_s, mean(frac_err) = 4.049e-02, max(frac_err) = 6.245e-01
+	 key = vnuc, mean(frac_err) = 2.734e-02, max(frac_err) = 3.379e-01
+	 key = T, mean(frac_err) = 7.994e-02, max(frac_err) = 1.301e+00
+	 key = rho, mean(frac_err) = 1.446e-01, max(frac_err) = 2.625e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.917e-02, max(frac_err) = 1.747e+00
+Profile 104
+	 key = nabla_mhdr, mean(frac_err) = 2.833e-03, max(frac_err) = 4.916e-02
+	 key = nabla_hydro, mean(frac_err) = 2.833e-03, max(frac_err) = 4.916e-02
+	 key = R, mean(frac_err) = 1.748e-04, max(frac_err) = 1.492e-03
+	 key = c_s, mean(frac_err) = 4.050e-02, max(frac_err) = 6.247e-01
+	 key = vnuc, mean(frac_err) = 2.733e-02, max(frac_err) = 3.377e-01
+	 key = T, mean(frac_err) = 7.994e-02, max(frac_err) = 1.301e+00
+	 key = rho, mean(frac_err) = 1.445e-01, max(frac_err) = 2.623e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.924e-02, max(frac_err) = 1.749e+00
+Profile 105
+	 key = nabla_mhdr, mean(frac_err) = 2.849e-03, max(frac_err) = 4.945e-02
+	 key = nabla_hydro, mean(frac_err) = 2.849e-03, max(frac_err) = 4.945e-02
+	 key = R, mean(frac_err) = 1.736e-04, max(frac_err) = 1.481e-03
+	 key = c_s, mean(frac_err) = 4.051e-02, max(frac_err) = 6.249e-01
+	 key = vnuc, mean(frac_err) = 2.731e-02, max(frac_err) = 3.376e-01
+	 key = T, mean(frac_err) = 7.993e-02, max(frac_err) = 1.301e+00
+	 key = rho, mean(frac_err) = 1.444e-01, max(frac_err) = 2.621e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.930e-02, max(frac_err) = 1.751e+00
+Profile 106
+	 key = nabla_mhdr, mean(frac_err) = 2.865e-03, max(frac_err) = 4.974e-02
+	 key = nabla_hydro, mean(frac_err) = 2.865e-03, max(frac_err) = 4.974e-02
+	 key = R, mean(frac_err) = 1.724e-04, max(frac_err) = 1.472e-03
+	 key = c_s, mean(frac_err) = 4.052e-02, max(frac_err) = 6.251e-01
+	 key = vnuc, mean(frac_err) = 2.730e-02, max(frac_err) = 3.374e-01
+	 key = T, mean(frac_err) = 7.993e-02, max(frac_err) = 1.301e+00
+	 key = rho, mean(frac_err) = 1.444e-01, max(frac_err) = 2.619e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.936e-02, max(frac_err) = 1.752e+00
+Profile 107
+	 key = nabla_mhdr, mean(frac_err) = 2.881e-03, max(frac_err) = 5.005e-02
+	 key = nabla_hydro, mean(frac_err) = 2.881e-03, max(frac_err) = 5.005e-02
+	 key = R, mean(frac_err) = 1.713e-04, max(frac_err) = 1.462e-03
+	 key = c_s, mean(frac_err) = 4.053e-02, max(frac_err) = 6.253e-01
+	 key = vnuc, mean(frac_err) = 2.729e-02, max(frac_err) = 3.372e-01
+	 key = T, mean(frac_err) = 7.992e-02, max(frac_err) = 1.300e+00
+	 key = rho, mean(frac_err) = 1.443e-01, max(frac_err) = 2.617e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.943e-02, max(frac_err) = 1.754e+00
+Profile 108
+	 key = nabla_mhdr, mean(frac_err) = 2.897e-03, max(frac_err) = 5.033e-02
+	 key = nabla_hydro, mean(frac_err) = 2.897e-03, max(frac_err) = 5.033e-02
+	 key = R, mean(frac_err) = 1.702e-04, max(frac_err) = 1.452e-03
+	 key = c_s, mean(frac_err) = 4.054e-02, max(frac_err) = 6.255e-01
+	 key = vnuc, mean(frac_err) = 2.728e-02, max(frac_err) = 3.370e-01
+	 key = T, mean(frac_err) = 7.991e-02, max(frac_err) = 1.300e+00
+	 key = rho, mean(frac_err) = 1.442e-01, max(frac_err) = 2.615e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.949e-02, max(frac_err) = 1.755e+00
+Profile 109
+	 key = nabla_mhdr, mean(frac_err) = 2.913e-03, max(frac_err) = 5.066e-02
+	 key = nabla_hydro, mean(frac_err) = 2.913e-03, max(frac_err) = 5.066e-02
+	 key = R, mean(frac_err) = 1.691e-04, max(frac_err) = 1.443e-03
+	 key = c_s, mean(frac_err) = 4.055e-02, max(frac_err) = 6.257e-01
+	 key = vnuc, mean(frac_err) = 2.727e-02, max(frac_err) = 3.368e-01
+	 key = T, mean(frac_err) = 7.990e-02, max(frac_err) = 1.300e+00
+	 key = rho, mean(frac_err) = 1.441e-01, max(frac_err) = 2.613e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.955e-02, max(frac_err) = 1.757e+00
+Profile 110
+	 key = nabla_mhdr, mean(frac_err) = 2.930e-03, max(frac_err) = 5.097e-02
+	 key = nabla_hydro, mean(frac_err) = 2.930e-03, max(frac_err) = 5.097e-02
+	 key = R, mean(frac_err) = 1.681e-04, max(frac_err) = 1.434e-03
+	 key = c_s, mean(frac_err) = 4.056e-02, max(frac_err) = 6.259e-01
+	 key = vnuc, mean(frac_err) = 2.725e-02, max(frac_err) = 3.367e-01
+	 key = T, mean(frac_err) = 7.988e-02, max(frac_err) = 1.299e+00
+	 key = rho, mean(frac_err) = 1.441e-01, max(frac_err) = 2.611e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.962e-02, max(frac_err) = 1.758e+00
+Profile 111
+	 key = nabla_mhdr, mean(frac_err) = 2.946e-03, max(frac_err) = 5.126e-02
+	 key = nabla_hydro, mean(frac_err) = 2.946e-03, max(frac_err) = 5.126e-02
+	 key = R, mean(frac_err) = 1.670e-04, max(frac_err) = 1.425e-03
+	 key = c_s, mean(frac_err) = 4.057e-02, max(frac_err) = 6.261e-01
+	 key = vnuc, mean(frac_err) = 2.724e-02, max(frac_err) = 3.365e-01
+	 key = T, mean(frac_err) = 7.987e-02, max(frac_err) = 1.299e+00
+	 key = rho, mean(frac_err) = 1.440e-01, max(frac_err) = 2.609e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.967e-02, max(frac_err) = 1.760e+00
+Profile 112
+	 key = nabla_mhdr, mean(frac_err) = 2.962e-03, max(frac_err) = 5.159e-02
+	 key = nabla_hydro, mean(frac_err) = 2.962e-03, max(frac_err) = 5.159e-02
+	 key = R, mean(frac_err) = 1.660e-04, max(frac_err) = 1.416e-03
+	 key = c_s, mean(frac_err) = 4.058e-02, max(frac_err) = 6.263e-01
+	 key = vnuc, mean(frac_err) = 2.723e-02, max(frac_err) = 3.363e-01
+	 key = T, mean(frac_err) = 7.986e-02, max(frac_err) = 1.299e+00
+	 key = rho, mean(frac_err) = 1.439e-01, max(frac_err) = 2.607e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.974e-02, max(frac_err) = 1.761e+00
+Profile 113
+	 key = nabla_mhdr, mean(frac_err) = 2.979e-03, max(frac_err) = 5.187e-02
+	 key = nabla_hydro, mean(frac_err) = 2.979e-03, max(frac_err) = 5.187e-02
+	 key = R, mean(frac_err) = 1.650e-04, max(frac_err) = 1.407e-03
+	 key = c_s, mean(frac_err) = 4.059e-02, max(frac_err) = 6.265e-01
+	 key = vnuc, mean(frac_err) = 2.722e-02, max(frac_err) = 3.361e-01
+	 key = T, mean(frac_err) = 7.984e-02, max(frac_err) = 1.298e+00
+	 key = rho, mean(frac_err) = 1.438e-01, max(frac_err) = 2.606e+00
+	 key = Pgas, mean(frac_err) = 3.807e-01, max(frac_err) = 8.989e+00
+	 key = H_Preduced, mean(frac_err) = 9.980e-02, max(frac_err) = 1.763e+00
+Profile 114
+	 key = nabla_mhdr, mean(frac_err) = 6.825e-03, max(frac_err) = 8.178e-02
+	 key = nabla_hydro, mean(frac_err) = 6.825e-03, max(frac_err) = 8.178e-02
+	 key = R, mean(frac_err) = 9.303e-04, max(frac_err) = 5.155e-03
+	 key = c_s, mean(frac_err) = 1.478e-01, max(frac_err) = 1.617e+00
+	 key = vnuc, mean(frac_err) = 7.566e-02, max(frac_err) = 5.681e-01
+	 key = T, mean(frac_err) = 3.576e-01, max(frac_err) = 4.452e+00
+	 key = rho, mean(frac_err) = 8.243e-01, max(frac_err) = 1.257e+01
+	 key = Pgas, mean(frac_err) = 4.191e+00, max(frac_err) = 9.878e+01
+	 key = H_Preduced, mean(frac_err) = 4.511e-01, max(frac_err) = 6.275e+00
+Profile 115
+	 key = nabla_mhdr, mean(frac_err) = 6.861e-03, max(frac_err) = 8.221e-02
+	 key = nabla_hydro, mean(frac_err) = 6.861e-03, max(frac_err) = 8.221e-02
+	 key = R, mean(frac_err) = 9.251e-04, max(frac_err) = 5.126e-03
+	 key = c_s, mean(frac_err) = 1.479e-01, max(frac_err) = 1.617e+00
+	 key = vnuc, mean(frac_err) = 7.564e-02, max(frac_err) = 5.679e-01
+	 key = T, mean(frac_err) = 3.575e-01, max(frac_err) = 4.451e+00
+	 key = rho, mean(frac_err) = 8.238e-01, max(frac_err) = 1.256e+01
+	 key = Pgas, mean(frac_err) = 4.191e+00, max(frac_err) = 9.878e+01
+	 key = H_Preduced, mean(frac_err) = 4.514e-01, max(frac_err) = 6.281e+00
+Profile 116
+	 key = nabla_mhdr, mean(frac_err) = 6.898e-03, max(frac_err) = 8.268e-02
+	 key = nabla_hydro, mean(frac_err) = 6.898e-03, max(frac_err) = 8.268e-02
+	 key = R, mean(frac_err) = 9.199e-04, max(frac_err) = 5.098e-03
+	 key = c_s, mean(frac_err) = 1.479e-01, max(frac_err) = 1.618e+00
+	 key = vnuc, mean(frac_err) = 7.562e-02, max(frac_err) = 5.678e-01
+	 key = T, mean(frac_err) = 3.575e-01, max(frac_err) = 4.450e+00
+	 key = rho, mean(frac_err) = 8.233e-01, max(frac_err) = 1.255e+01
+	 key = Pgas, mean(frac_err) = 4.191e+00, max(frac_err) = 9.878e+01
+	 key = H_Preduced, mean(frac_err) = 4.517e-01, max(frac_err) = 6.288e+00
+Profile 117
+	 key = nabla_mhdr, mean(frac_err) = 6.934e-03, max(frac_err) = 8.314e-02
+	 key = nabla_hydro, mean(frac_err) = 6.934e-03, max(frac_err) = 8.314e-02
+	 key = R, mean(frac_err) = 9.149e-04, max(frac_err) = 5.070e-03
+	 key = c_s, mean(frac_err) = 1.479e-01, max(frac_err) = 1.618e+00
+	 key = vnuc, mean(frac_err) = 7.560e-02, max(frac_err) = 5.676e-01
+	 key = T, mean(frac_err) = 3.574e-01, max(frac_err) = 4.449e+00
+	 key = rho, mean(frac_err) = 8.229e-01, max(frac_err) = 1.254e+01
+	 key = Pgas, mean(frac_err) = 4.191e+00, max(frac_err) = 9.878e+01
+	 key = H_Preduced, mean(frac_err) = 4.520e-01, max(frac_err) = 6.294e+00
+Profile 118
+	 key = nabla_mhdr, mean(frac_err) = 6.971e-03, max(frac_err) = 8.361e-02
+	 key = nabla_hydro, mean(frac_err) = 6.971e-03, max(frac_err) = 8.361e-02
+	 key = R, mean(frac_err) = 9.100e-04, max(frac_err) = 5.042e-03
+	 key = c_s, mean(frac_err) = 1.480e-01, max(frac_err) = 1.619e+00
+	 key = vnuc, mean(frac_err) = 7.558e-02, max(frac_err) = 5.674e-01
+	 key = T, mean(frac_err) = 3.574e-01, max(frac_err) = 4.448e+00
+	 key = rho, mean(frac_err) = 8.224e-01, max(frac_err) = 1.253e+01
+	 key = Pgas, mean(frac_err) = 4.191e+00, max(frac_err) = 9.878e+01
+	 key = H_Preduced, mean(frac_err) = 4.523e-01, max(frac_err) = 6.300e+00
+Profile 119
+	 key = nabla_mhdr, mean(frac_err) = 7.007e-03, max(frac_err) = 8.407e-02
+	 key = nabla_hydro, mean(frac_err) = 7.007e-03, max(frac_err) = 8.407e-02
+	 key = R, mean(frac_err) = 9.052e-04, max(frac_err) = 5.016e-03
+	 key = c_s, mean(frac_err) = 1.480e-01, max(frac_err) = 1.619e+00
+	 key = vnuc, mean(frac_err) = 7.556e-02, max(frac_err) = 5.673e-01
+	 key = T, mean(frac_err) = 3.573e-01, max(frac_err) = 4.446e+00
+	 key = rho, mean(frac_err) = 8.219e-01, max(frac_err) = 1.252e+01
+	 key = Pgas, mean(frac_err) = 4.191e+00, max(frac_err) = 9.878e+01
+	 key = H_Preduced, mean(frac_err) = 4.526e-01, max(frac_err) = 6.306e+00

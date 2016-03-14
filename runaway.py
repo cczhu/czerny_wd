@@ -4,7 +4,7 @@ import numpy as np
 import copy
 import os, sys
 
-def obtain_model(mystar, i, r_in, verbose=False):
+def obtain_model(mystar, i, r_in, omega_warn=10., verbose=False):
 	"""Used by make_runaway to calculate models with increasing entropy S_want.
 	"""
 
@@ -36,19 +36,19 @@ def obtain_model(mystar, i, r_in, verbose=False):
 #	if r_in.has_key("L_original"):
 #		outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
 #													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
-#													omega_warn=1.)
+#													omega_warn=omega_warn)
 #		if outerr_code:
 #			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH 0.5*OMEGA ---------------"
 #			outerr_code = mystar.getrotatingstarmodel(densest=densest, omegaest=0.5*omegaest, S_want=S_want, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], 
 #													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, interior_dscoeff=deltastepcoeff_rho, 
-#													omega_warn=1.)
+#													omega_warn=omega_warn)
 	if r_in.has_key("L_original"):
 		outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
-													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=omega_warn)
 		if outerr_code:
 			print "-----------HACK - OUTERR_CODE OUTPUTTED BY OVERLOOP, TRYING AGAIN WITH A LOWER OMEGA AND TIGHTER STEPPING---------------"
 			outerr_code = mystar.getrotatingstarmodel_2d(densest=densest, omegaest=omegaest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
-													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=1.)
+													damp_nrstep=damp_nrstep, deltastepcoeff=deltastepcoeff_omega, omega_warn=omega_warn)
 	else:	# For now, keep P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"]
 		outerr_code = mystar.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol, 
 										deltastepcoeff=deltastepcoeff_rho)
@@ -62,28 +62,32 @@ def obtain_model(mystar, i, r_in, verbose=False):
 
 
 def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), 
-					mintemp=1e5, tog_coul=True, mass_tol=1e-3, P_end_ratio=1e-8, densest=False, stop_mindenserr=1e-10, 
-					L_tol=1e-2, keepstars=False, simd_userot=True, simd_usegammavar=True, simd_usegrav=True, simd_suppress=False, 
-					omega_crit_tol=1e-2, omega_warn=10., om_err_tol=[1e6, 1e7], verbose=True):
+					mintemp=1e5, mass_tol=1e-6, P_end_ratio=1e-8, densest=False, stop_mindenserr=1e-10, 
+					L_tol=1e-6, keepstars=False, simd_userot=True, simd_usegammavar=True, simd_usegrav=True,
+					omega_crit_tol=1e-3, omega_warn=10., de_err_tol=[1e6, 1e7], verbose=True):
 	"""Obtains runaway of a star of some given mass, magnetic field, and rotation.  Outputs an object (usually several hundred megs large) that includes run inputs as "run_inputs", as well as all stellar output curves (hence its size) under "stars".
 
 	Arguments:
-	starmass: wanted mass
-	mymag: magnetic profile object.  Defaults to false, meaning no magnetic field.
-	omega: rigid rotation angular velocity.  Defaults to 0 (non-rotating).  If < 0, attempts to estimate break-up omega with self.getomegamax(), if >= 0, uses user defined value.
-	S_arr: list of central entropy values in the runaway track
-	mintemp: temperature floor, effectively switches from adiabatic to isothermal profile if reached
-	mass_tol: fractional tolerance between mass wanted and mass produced by self.getstarmodel()
-	P_end_ratio: ratio of P/P_c at which to terminate stellar integration
-	densest: central density initial estimate for self.getstarmodel()
-	L_tol: conservation of angular momentum error tolerance
-	simd_userot: use Solberg-Hoiland deviation from adiabatic temperature gradient
-	simd_usegammavar: use gamma = c_P/c_V index magnetic deviation from adiabatic temperature gradient
-	simd_usegrav: use gravity magnetic devation from adiabatic temperature gradient
-	simd_suppress: suppresses deviations from adiabaticity in first step of integration
-	omega_crit_tol: when using mystar.getomegamax(), absolute error tolerance for maximum omega
-	omega_warn: stop integration within mystar.getrotatingstarmodel() if self.omega approaches omega_warn*omega_crit estimate.  Defaults to 10 to prevent premature stoppage.
-	verbose: report happenings within code
+	starmass : wanted mass
+	mymag : magnetic profile object.  Defaults to false, meaning no magnetic field.
+	omega : rigid rotation angular velocity.  Defaults to 0 (non-rotating).  If < 0, attempts to estimate break-up omega with self.getomegamax(), if >= 0, uses user defined value.
+	S_arr : list of central entropy values in the runaway track
+	mintemp : temperature floor, effectively switches from adiabatic to isothermal profile if reached
+	mass_tol : fractional tolerance between mass wanted and mass produced by self.getstarmodel()
+	P_end_ratio : ratio of P/P_c at which to terminate stellar integration
+	densest : central density initial estimate for self.getstarmodel()
+	stop_mindenserr : density floor, below which integration is halted.
+		Default is set to 1e-10 to prevent it from ever being reached.  
+		Helmholtz sometimes has trouble below this 1e-8; try adjusting this
+		value to eliminate inverter errors.
+	L_tol : conservation of angular momentum error tolerance
+	simd_userot : use Solberg-Hoiland deviation from adiabatic temperature gradient
+	simd_usegammavar : use gamma = c_P/c_V index magnetic deviation from adiabatic temperature gradient
+	simd_usegrav : use gravity magnetic devation from adiabatic temperature gradient
+	omega_crit_tol : when using mystar.getomegamax(), absolute error tolerance for maximum omega
+	omega_warn : stop integration within mystar.getrotatingstarmodel() if self.omega approaches omega_warn*omega_crit estimate.  Defaults to 10 to prevent premature stoppage.
+	de_err_tol : densities at which relaxed error tolerances kick in.
+	verbose : report happenings within code
 	"""
 
 	# Save a few details about the magnetic field (though we'll need better records for the actual paper)
@@ -101,11 +105,11 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 			"S_arr": S_arr, 
 			"mintemp": mintemp,  
 			"composition": "CO",
-			"tog_coul": tog_coul,
+			"tog_coul": True,
 			"simd_userot": simd_userot, 
 			"simd_usegammavar": simd_usegammavar, 
 			"simd_usegrav": simd_usegrav, 
-			"simd_suppress": simd_suppress, 
+			"simd_suppress": False, 
 			"P_end_ratio": P_end_ratio, 
 			"ps_eostol": 1e-8, 
 			"fakeouterpoint": False, 
@@ -118,18 +122,33 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 			"L_tol": L_tol, 
 			"omega_crit_tol": omega_crit_tol, 
 			"omega_warn": omega_warn,
-			"lowerr_tol": om_err_tol[0],
-			"mederr_tol": om_err_tol[1]}
+			"lowerr_tol": de_err_tol[0],
+			"mederr_tol": de_err_tol[1]}
 
 	if (omega != 0) or mymag:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
 		mymagzero = magprof.magprofile(None, None, None, None, blankfunc=True)
-		hstar = Star.maghydrostar(r_in["mass"], max(5e6,mintemp), magprofile=mymagzero, omega=0., S_want=False, mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mindenserr=r_in["stop_mindenserr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+		hstar = Star.maghydrostar(r_in["mass"], max(5e6,mintemp), magprofile=mymagzero, omega=0., S_want=False, 
+								mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], 
+								simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], 
+								simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], 
+								P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], 
+								stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], 
+								stop_positivepgrad=r_in["stop_positivepgrad"], stop_mindenserr=r_in["stop_mindenserr"], 
+								densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
+								omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 		densest=0.9*hstar.data["rho"][0]
 
 	print "*************Okay, let's make a low-temperature (possibly MHD/rotating) star************"
 	mystar = Star.maghydrostar(r_in["mass"], max(5e6,mintemp), magprofile=mymag, omega=r_in["omega"], S_want=False, 	#Rest after this is identical to function call above
-				mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], stop_invertererr=r_in["stop_invertererr"], stop_mindenserr=r_in["stop_mindenserr"], stop_mrat=r_in["stop_mrat"], stop_positivepgrad=r_in["stop_positivepgrad"], densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+								mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], 
+								simd_userot=r_in["simd_userot"], simd_usegammavar=r_in["simd_usegammavar"], 
+								simd_usegrav=r_in["simd_usegrav"], simd_suppress=r_in["simd_suppress"], 
+								P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], 
+								stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], 
+								stop_positivepgrad=r_in["stop_positivepgrad"], stop_mindenserr=r_in["stop_mindenserr"], 
+								densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
+								omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 
 	# If we use a high-temperature mintemp, remove any S_arr
 	if S_arr[0] < mystar.data["Sgas"][0]:
@@ -179,7 +198,7 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 
 		print "*************Star #{0:d}, entropy = {1:.3f}************".format(i, r_in["S_arr"][i])
 
-		outerr_code = obtain_model(mystar, i, r_in, verbose=verbose)
+		outerr_code = obtain_model(mystar, i, r_in, omega_warn=r_in["omega_warn"], verbose=verbose)
 
 		if outerr_code:
 			if outerr_code == "nrepsnotconverged_err":
