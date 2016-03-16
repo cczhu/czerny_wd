@@ -10,7 +10,7 @@ import magprofile_mass as magprof
 import Sprofile_mass as sprof
 
 
-class mhs_steve(maghydrostar_core):
+class mhs_steve_leg(maghydrostar_core):
 	"""
 	Stevenson-based magnetohydrostatic star generator.  Generates spherical 
 	WDs with adiabatic temperature profiles using the Helmholtz 
@@ -213,47 +213,38 @@ class mhs_steve(maghydrostar_core):
 
 		[dens, entropy] = self.getdens_PT(press, temp, failtrig=failtrig)
 
+		Bfld = self.magf.fBfld(R, mass)
+		Pchi = (1./8./np.pi)*Bfld**2
+
 		# Take mag pressure Pchi = 0 for calculating hydro coefficients
-		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s] = self.geteosgradients(dens, temp, 0., failtrig=failtrig)
+		[adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s] = self.geteosgradients(dens, temp, 0.0, failtrig=failtrig)
 
 		dydx = np.zeros(3)
 		dydx[0] = 1./(4.*np.pi*R**2.*dens)
 		dptotaldm = -self.grav*mass/(4.*np.pi*R**4.) + 1./(6.*np.pi)*omega**2/R
 		dydx[1] = dptotaldm 	#- Pchi_grad*dydx[0]
 
-		if self.nabladev:
-			Bfld = np.sqrt(8.*np.pi*press*self.nabladev)
-		else:
-			Bfld = self.magf.fBfld(R, mass)
-		Pchi = (1./8./np.pi)*Bfld**2
-
 		if isotherm:
 
-			hydrograd = 0.												# Zero out hydrograd and deviation; totalgrad then will equal 0.
+			hydrograd = 0.		# Zero out hydrograd and deviation; totalgrad then will equal 0.
 			nabla_terms = {"v_conv_st": 0., "c_s_st": c_s, "nd": 0.}	# Populate deviations as zero
 
 		else:
 
 			nabla_terms = {"c_s_st": c_s}
 
-			agrav = self.grav*mass/R**2.										# grav modulus = GM_enc/r^2
+#			agrav_eff = -dptotaldm/dydx[0]/dens		# g_eff = -dP/dr/rho
+#			nabla_terms["c_s_st"] = (agrav_eff*H_P)**0.5					# c_s = sqrt(g*H_P) (Stevenson 79 sentence below Eqn. 37)
+
+			agrav = self.grav*mass/R**2.			# g_eff = Gm/r^2
 			H_P = min(-press*dydx[0]/dptotaldm, (press/self.grav/dens**2)**0.5)	# H_P = min(-P/(dP/dR), sqrt(P/G\rho^2)) (Eggleton 71 approx.)
 
-			nabla_terms["v_conv_st"] = self.vc_coeff*(delta*agrav*H_P/cP/temp*Fconv/dens)**(1./3.)
-			nabla_terms["nd"] = self.nab_coeff*(1./delta)*nabla_terms["v_conv_st"]**2/(agrav*H_P)
-			#nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2		# c_s = sqrt(g*H_P) (Stevenson 79 sentence below Eqn. 37)
+			nabla_terms["v_conv_st"] = (delta*agrav*H_P/cP/temp*Fconv/dens)**(1./3.)
 
-			assert nabla_terms["v_conv_st"] >= 0.								# Just in case this somehow becomes negative
-
-			if omega > 0.:
-				rossby = nabla_terms["v_conv_st"]/(2.*omega*H_P)					# v_0/(2*omega*H_P)
-				nabrat = (1. + (6./25./np.pi**2)**(4./5.)*rossby**(-8./5.))**0.5
-				nabla_terms["v_conv_st"] = nabla_terms["v_conv_st"]*nabrat**(-1./4.)
-				nabla_terms["nd"] = nabla_terms["nd"]*nabrat						# obtain v from v_0
-			elif Bfld > 0.:
-				alfrat = Bfld**2/(4.*np.pi*dens*nabla_terms["v_conv_st"]**2)
-				nabla_terms["v_conv_st"] = nabla_terms["v_conv_st"]*(1. + 0.538*alfrat**(13./8.))**(-4./13.)
-				nabla_terms["nd"] = nabla_terms["nd"]*(1. + 0.18*alfrat**(6./5.))**(5./6.)
+			if omega == 0.:
+				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2
+			else:
+				nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])*(2.*H_P*omega/nabla_terms["c_s_st"])
 
 		if self.nablarat_crit and (abs(nabla_terms["nd"])/hydrograd > self.nablarat_crit):
 			raise AssertionError("ERROR: Hit critical nabla!  Code is now designed to throw an error so you can jump to the point of error.")
@@ -268,20 +259,14 @@ class mhs_steve(maghydrostar_core):
 
 
 	def first_derivatives_steve(self, dens, M, Pc, Tc, omega, failtrig=[-100]):
-		"""
-		First step to take for self.derivatives_steve().   R, P, temp are at r = R,
-		while hydrograd, totalgrad, nabla_terms are derivative and magnetic field values
-		for r = 0.
+		"""First step to take for self.derivatives_steve()
 		"""
 
 		R = (3.*M/(4.*np.pi*dens))**(1./3.)
 		moddens = 4./3.*np.pi*dens
 		P = Pc - (3.*self.grav/(8.*np.pi)*moddens**(4./3.) - 0.25/np.pi*omega**2*moddens**(1./3.))*M**(2./3.)	# This is integrated out assuming constant density and magnetic field strength
 
-		if self.nabladev:
-			Bfld = np.sqrt(8.*np.pi*Pc*self.nabladev)
-		else:
-			Bfld = self.magf.fBfld(R, M)
+		Bfld = self.magf.fBfld(R, M)
 		Pchi = (1./8./np.pi)*Bfld**2
 
 		[adgradred_dumm, hydrograd, nu_dumm, alpha_dumm, delta, Gamma1, cP, cPhydro_dumm, c_s] = self.geteosgradients(dens, Tc, 0.)	# Central rho, T, and current magnetic pressure since dP/dr = 0 for first step.
@@ -304,8 +289,6 @@ class mhs_steve(maghydrostar_core):
 
 		dy_est = np.array([R/M, (P - Pc)/M, (temp - Tc)/M])
 
-		# Since this code is both derivative and integrator, R, P and temp are integrated values at r = R, while
-		# Bfld...nabla_terms are derivative and associated values at r = 0.
 		return [R, P, temp, Bfld, Pchi, hydrograd, totalgrad, nabla_terms, dy_est, isotherm]
 
 
@@ -779,23 +762,10 @@ class mhs_steve(maghydrostar_core):
 
 
 	def getconvection_vconv(self):
-		"""Subloop of getconvection that calculates the convective and nuclear velocities - overwrite of StarModCore/getconvection_vconv
+		"""overwrite StarModCore/getconvection_vconv
 		"""
 		self.data["vconv"] = self.vc_coeff*(self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
 		self.data["vnuc"] = self.vc_coeff*(self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
-
-		# Since in the code we assume vnuc = vconv, and vconv here is our estimate for the MODIFIED
-		# convective velocity due to heating the star, rossby and alfven_ratio are calculated
-		# using vnuc.
-		if self.omega > 0.:
-			rossby = self.data["vnuc"]/(2.*self.omega*self.data["H_Preduced"])	# v_0/(2*omega*H_P)
-			nabrat = (1. + (6./25./np.pi**2)**(4./5.)*rossby**(-8./5.))**0.5
-			self.data["vconv"] = self.data["vconv"]*nabrat**(-1./4.)
-			self.data["vnuc"] = self.data["vnuc"]*nabrat**(-1./4.)
-		elif np.mean(self.data["B"]) > 0.:
-			alfrat = self.data["B"]**2/(4.*np.pi*self.data["rho"]*self.data["vnuc"]**2)	# B^2/(4*pi*dens*v_0^2)
-			self.data["vconv"] = self.data["vconv"]*(1. + 0.538*alfrat**(13./8.))**(-4./13.)
-			self.data["vnuc"] = self.data["vnuc"]*(1. + 0.538*alfrat**(13./8.))**(-4./13.)
 
 
 ########################################### BLANK STARMOD FOR POST-PROCESSING #############################################

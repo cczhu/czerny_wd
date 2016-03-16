@@ -1,5 +1,4 @@
-import StarModSteve as StarOld
-import StarModSteveNEWDERIV as StarND
+import StarModSteve as Star
 import magprofile_mass as magprof
 import rhoTcontours as rtc
 import numpy as np
@@ -66,8 +65,9 @@ def obtain_model(mystar, i, r_in, omega_warn=10., verbose=False):
 	return outerr_code
 
 
-def make_runaway_steve(whichstarmod="old", starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), 
-						mintemp=1e5, S_old=False, mlt_coeff="phil", mass_tol=1e-6, P_end_ratio=1e-8, 
+def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), 
+						mlt_coeff="phil", uvs_k=3, uvs_s=None,
+						mintemp=1e5, S_old=False, mass_tol=1e-6, P_end_ratio=1e-8, 
 						densest=False, stop_mindenserr=1e-10, L_tol=1e-6, keepstars=False, 
 						omega_crit_tol=1e-3, omega_warn=10., de_err_tol=[1e6, 1e7], verbose=True):
 	"""Obtains runaway of a star of some given mass, magnetic field, and rotation.  Outputs an object (usually several hundred megs large) that includes run inputs as "run_inputs", as well as all stellar output curves (hence its size) under "stars".
@@ -88,6 +88,10 @@ def make_runaway_steve(whichstarmod="old", starmass=1.2*1.9891e33, mymag=False, 
 		is from Stevenson 1979.  Since Stevenson's rotational and magnetic
 		corrections to convection are expressed as ratios of velocity and
 		temperature gradient, they can be used with any of these mlt_coeffs.
+	uvs_k : degree of the smoothing spline in scipy.interpolate.UnivariateSpline.
+		Must be <= 5; default is k=3.
+	uvs_s : UnivariateSpline positive smoothing factor used to choose the
+		number of knots.  Default is None.
 	mass_tol : fractional tolerance between mass wanted and mass produced by self.getstarmodel()
 	P_end_ratio : ratio of P/P_c at which to terminate stellar integration
 	densest : central density initial estimate for self.getstarmodel()
@@ -101,11 +105,6 @@ def make_runaway_steve(whichstarmod="old", starmass=1.2*1.9891e33, mymag=False, 
 	de_err_tol : densities at which relaxed error tolerances kick in.
 	verbose : report happenings within code
 	"""
-
-	if whichstarmod=="new":
-		Star = StarND
-	else:
-		Star = StarOld
 
 	# Save a few details about the magnetic field (though we'll need better records for the actual paper)
 	try:
@@ -138,12 +137,14 @@ def make_runaway_steve(whichstarmod="old", starmass=1.2*1.9891e33, mymag=False, 
 			"omega_crit_tol": omega_crit_tol, 
 			"omega_warn": omega_warn,
 			"lowerr_tol": de_err_tol[0],
-			"mederr_tol": de_err_tol[1]}
+			"mederr_tol": de_err_tol[1],
+			"uvs_k": uvs_k,
+			"uvs_s": uvs_s}
 
 	if (omega != 0) or mymag:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
 		mymagzero = magprof.magprofile(None, None, None, None, blankfunc=True)
-		hstar = Star.mhs_snd(r_in["mass"], False, magprofile=mymagzero, omega=0., temp_c=5e6, 
+		hstar = Star.mhs_steve(r_in["mass"], False, magprofile=mymagzero, omega=0., temp_c=5e6, 
 							mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], 
 							mlt_coeff=r_in["mlt_coeff"], P_end_ratio=r_in["P_end_ratio"], 
 							ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], 
@@ -155,7 +156,7 @@ def make_runaway_steve(whichstarmod="old", starmass=1.2*1.9891e33, mymag=False, 
 
 	print "*************Okay, let's make a low-temperature (MHD/rotating) star************"
 	#Rest after this is identical to function call above
-	mystar = Star.mhs_snd(r_in["mass"], False, magprofile=mymag, omega=r_in["omega"], temp_c=5e6,
+	mystar = Star.mhs_steve(r_in["mass"], False, magprofile=mymag, omega=r_in["omega"], temp_c=5e6,
 							mintemp=r_in["mintemp"], composition=r_in["composition"], togglecoulomb=r_in["tog_coul"], 
 							mlt_coeff=r_in["mlt_coeff"], P_end_ratio=r_in["P_end_ratio"], 
 							ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], 
@@ -214,8 +215,10 @@ def make_runaway_steve(whichstarmod="old", starmass=1.2*1.9891e33, mymag=False, 
 		# If we turn on S_old and, during the previous step, we passed the ignition line, start recording old entropy profiles
 		# and passing them on to the next star.
 		if r_in["S_old"] and mystar.data["T"][0] > ignition_line_f(mystar.data["rho"][0]):
-			print "Using previous entropy profile"
-			myS_old = Star.sprof.entropy_profile(mystar.data["M"], mystar.data["Sgas"], mystar.data["v_conv_st"])
+#			print "Using previous entropy profile"
+#			if r_in["rezero_Sold"]:				# Bomb-proofing to keep extremely low entropy values from messing up integration
+#				mystar.data["Sgas"][mystar.data["Sgas"] < 0.] = 0.
+			myS_old = Star.sprof.entropy_profile(mystar.data["M"], mystar.data["Sgas"], mystar.data["v_conv_st"], spline_k=r_in["uvs_k"], spline_s=r_in["uvs_s"])
 			mystar.S_old = myS_old.S_old
 			mystar.dS_old = myS_old.dS_old
 			mystar.vconv_Sold = myS_old.vconv_Sold
