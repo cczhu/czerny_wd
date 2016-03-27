@@ -15,54 +15,66 @@ class maghydrostar_core():
 	of state functions and common post-processing functions.  Parent class of 
 	maghydrostar and mhs_steve; see child class documentation for more details.
 
-	def __init__(self, mass, temp_c, magprofile=False, omega=0., L_want=0., 
-				mintemp=1e5, composition="CO", togglecoulomb=True,
-				fakeouterpoint=False, stop_invertererr=True, 
-				stop_mrat=2., stop_positivepgrad=True, stop_mindenserr=1e-10, 
-				mass_tol=1e-6, L_tol=1e-6, omega_crit_tol=1e-3, nreps=30, 
-				stopcount_max=5, verbose=True):
-
 	Parameters
 	----------
-	mass : wanted mass (g)
-	temp_c : wanted central temperature (K).  If you want to use entropy, 
+	mass : float
+		Wanted mass (g)
+	temp_c : float
+		Wanted central temperature (K).  If you want to use entropy, 
 		then populate S_want (code will then ignore this value and 
 		calculate self-consistent temp_c).
-	magprofile : magnetic profile object.  Defaults to false, meaning no 
+	magprofile : magprofile object, optional
+		Magnetic profile object.  Defaults to false, meaning no 
 		magnetic field.  To insert a user-defined field, insert a magf object.
 		To generate a field with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas),
 		insert a float equal to delta.		
-	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
+	omega : float, optional
+		Rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
 		rotating).  If < 0, code attempts to estimate break-up omega with 
 		self.getomegamax(), if >= 0, uses user defined value.
-	L_want : wanted angular momentum.
-	mintemp : temperature floor (K), effectively switches from adiabatic 
+	L_want : float, optional
+		wanted angular momentum.
+	mintemp : float, optional
+		Temperature floor (K), effectively switches from adiabatic 
 		to isothermal profile if reached.
-	composition : "CO", "Mg" or "He" composition.
-	togglecoulomb : includes Coulomb corrections in EOS (corrections are 
+	composition : string, optional
+		"CO", "Mg" or "He" composition.
+	togglecoulomb : boolean, optional
+		If True, ncludes Coulomb corrections in EOS (corrections are 
 		included even if specific entropy becomes negative).
-	fakeouterpoint : add additional point to profile where M = mass_want to 
+	fakeouterpoint : boolean, optional
+		If True, add additional point to profile where M = mass_want to 
 		prevent interpolation attempts from failing.
-	stop_invertererr : stop integrating when EOS error is reached.
-	stop_mrat : stop integrating when integrated M is larger than 
+	stop_invertererr : boolean, True
+		If True, stop integrating when EOS error is reached.
+	stop_mrat : float, optional
+		Stop integrating when integrated M is larger than 
 		stop_mrat*mass.
-	stop_positivepgrad : stop integrating when dP/dr becomes positive.
-	stop_mindenserr : density floor, below which integration is halted.
+	stop_positivepgrad : boolean, optional
+		If True, stop integrating when dP/dr becomes positive.
+	stop_mindenserr : float, optional
+		Density floor, below which integration is halted.
 		Default is set to 1e-10 to prevent it from ever being reached.  
 		Helmholtz sometimes has trouble below this 1e-8; try adjusting this
 		value to eliminate inverter errors.
-	mass_tol : fractional tolerance between mass wanted and mass produced 
+	mass_tol : float, optional
+		Fractional tolerance between mass wanted and mass produced 
 		by self.getstarmodel()
-	L_tol : fractional tolerance between L wanted and L produced 
+	L_tol : float, optional
+		Fractional tolerance between L wanted and L produced 
 		by self.getrotatingstarmodel()
-	omega_crit_tol : when using the self.getomegamax() iterative finder, 
+	omega_crit_tol : float, optional
+		When using the self.getomegamax() iterative finder, 
 		absolute error tolerance for maximum omega.
-	nreps : max number of attempts to find a star in self.getstarmodel().
-	stopcount_max : when self.getstarmodel() detects that wanted mass and 
-					temp_c/S_want combination may not be achievable, number 
-					of stellar integration iterations to take before 
-					testing for global extrema.
-	verbose : report happenings within code.
+	nreps : int, optional
+		Max number of attempts to find a star in self.getstarmodel().
+	stopcount_max : int, optional
+		When self.getstarmodel() detects that wanted mass and 
+		temp_c/S_want combination may not be achievable, number 
+		of stellar integration iterations to take before 
+		testing for global extrema.
+	verbose : boolean, optional
+		If True, report happenings within code.
 
 	Returns
 	-------
@@ -745,6 +757,10 @@ class maghydrostar_core():
 			deltastepcoeff*abs(deltadens_previous).  Defaults to 0.1.
 		out_search : prints the rho and corresponding M values calculated by 
 			integrate_star during the shooting process
+
+		Returns
+		-------
+		None
 		"""
 
 		if mass_user:
@@ -830,36 +846,146 @@ class maghydrostar_core():
 
 	# EOS functions are passed failtrig as a list (since lists are mutable).
 	def getpress_rhoT(self, dens, temp, failtrig=[-100]):
+		"""Calls Helmholtz to return pressure and entropy from density and temperature
+
+		Parameters
+		----------
+		dens : float
+		temp : float
+		failtrig : single element list, optional
+			Function stores True in list if EOS error incurred
+			
+		Returns
+		-------
+		pressure : float
+		entropy : float
+		"""
 		pressure, energy, soundspeed, gammaout, entropy, failtrig[0] = \
 				myhmag.gethelmholtzeos(temp, dens, self.abar, self.zbar, self.togglecoulomb)
 		return [pressure, entropy]
 
 
 	def geteosgradients(self, dens, temp, Pchi, failtrig=[-100]):
+		"""Calls Helmholtz to return EOS gradients from density and temperature
+
+		Parameters
+		----------
+		dens : float
+		temp : float
+		Pchi : float
+			Magnetic energy (ALWAYS SET TO ZERO for Zhu et al. 2016)
+		failtrig : single element list, optional
+			Function stores True in list if EOS error incurred
+			
+		Returns
+		-------
+		adgradred : float
+			"Reduced adiabatic gradient" T/P_T*nabla_ad
+		hydrograd : float
+			nabla_ad
+		nu : float
+			-dln(rho)/dln(chi) (where chi = B^2/(8*pi*rho), from Feiden & Chaboyer 2012 (NOT USED in Zhu et al. 2016)
+		alpha : float
+			dln(rho)/dln(P)
+		delta : float
+			-dln(rho)/dln(T)
+		Gamma1 : float
+			Adiabatic exponent (K&W Eqn. 13.18)
+		cP : float
+			Specific heat at constant pressure
+		cPhydro : float
+			Equivalent specific heat at constant pressure in the absence of magnetic fields
+		c_s : float
+			Sound speed
+		"""
 		adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s, failtrig[0] = \
 				myhmag.gethelmgrads(temp, dens, Pchi, self.abar, self.zbar, self.togglecoulomb)
 		return [adgradred, hydrograd, nu, alpha, delta, Gamma1, cP, cPhydro, c_s]
 
 
 	def getpress_rhoS(self, dens, entropy, failtrig=[-100]):
+		"""Calls Helmholtz to return pressure and temperature from density and entropy
+
+		Parameters
+		----------
+		dens : float
+		entropy : float
+		failtrig : single element list, optional
+			Function stores True in list if EOS error incurred
+			
+		Returns
+		-------
+		pressure : float
+		temp : float
+		"""
 		temp, pressure, energy, soundspeed, gammaout, failtrig[0] = \
 				myhmag.geteosinversionsd(dens, self.abar, self.zbar, entropy, self.togglecoulomb)
 		return [pressure, temp]
 
 	def getdens_PT(self, press, temp, failtrig=[-100]):
+		"""Calls Helmholtz to return density and entropy from pressure and temperature
+
+		Parameters
+		----------
+		pressure : float
+		temp : float
+		failtrig : single element list, optional
+			Function stores True in list if EOS error incurred
+			
+		Returns
+		-------
+		dens : float
+		entropy : float
+		"""
 		dens, energy, soundspeed, gammaout, entropy, failtrig[0] = \
 				myhmag.geteosinversionpt(temp, self.abar, self.zbar, press, self.togglecoulomb)
 		return [dens, entropy]
 
 
 	def getdens_PS(self, press, entropy, failtrig=[-100]):
+		"""Calls Helmholtz to return density and temperature from pressure and entropy
+
+		Parameters
+		----------
+		pressure : float
+		entropy : float
+		failtrig : single element list, optional
+			Function stores True in list if EOS error incurred
+			
+		Returns
+		-------
+		dens : float
+		temp : float
+		"""
 		temp, dens, energy, soundspeed, gammaout, failtrig[0] = \
 				myhmag.geteosinversionsp(self.abar, self.zbar, press, entropy, True, self.togglecoulomb)
 		return [dens, temp]
 
 
 	def getdens_PS_est(self, press, entropy, failtrig=[-100], dens_est=1e6, temp_est=1e7, eostol=1e-8):
-		"""Identical to getdens_PS, but uses user-defined estimates to help with the Newton-Raphson algorithm.
+		"""Calls Helmholtz to return density and temperature from pressure and entropy.
+		Identical to getdens_PS, but uses user-defined estimates to help with the Newton-
+		Raphson algorithm.
+
+		Parameters
+		----------
+		pressure : float
+		entropy : float
+		failtrig : single element list, optional
+			Function stores True in list if EOS error incurred
+		dens_est : float, optional
+			Newton-Raphson initial density estimate
+		temp_est : float, optional
+			Newton-Raphson initial temperature estimate
+		eostol : float, optional
+			EOS accuracy tolerance
+			
+		Returns
+		-------
+		dens : float
+		temp : float
+		gammaout : float
+			Adiabatic exponent (K&W Eqn. 13.18)
 		"""
 		temp, dens, energy, soundspeed, gammaout, failtrig[0] = \
 				myhmag.geteosinversionsp_withest(self.abar, self.zbar, dens_est, temp_est, press, 
@@ -868,7 +994,20 @@ class maghydrostar_core():
 
 
 	def getgamma_PD(self, dens, press, failtrig=[-100]):
-		"""Obtains Gamma_1 = dP/drho_ad estimate for first_derivatives functions.
+		"""Obtains Gamma_1 = dP/drho_ad estimate for first_derivatives functions.  Currently
+		only used by StarMod.py.
+
+		Parameters
+		----------
+		dens : float
+		pressure : float
+		failtrig : single element list, optional
+			Function stores True in list if EOS error incurred
+			
+		Returns
+		-------
+		Gamma1_est : float
+			Adiabatic exponent (K&W Eqn. 13.18)
 		"""
 		temp_dummy, energy_dummy, soundspeed_dummy, Gamma1_est, entropy_dummy, failtrig[0] = \
 				myhmag.geteosinversionpd(dens, self.abar, self.zbar, press, self.togglecoulomb)
@@ -876,7 +1015,24 @@ class maghydrostar_core():
 
 
 	def gethelmeos_energies(self, dens, temp, failtrig=[-100]):
-		"""Obtains Gamma_1 = dP/drho_ad estimate for first_derivatives functions.
+		"""Calls Helmholtz to obtain specific internal and degeneracy energies from
+		density and temperature.
+
+		Parameters
+		----------
+		dens : float
+		pressure : float
+		failtrig : single element list, optional
+			Function stores True in list if EOS error incurred
+			
+		Returns
+		-------
+		e_int : float
+			Specific internal energy
+		e_deg : float
+			Specific degeneracy energy; calculated in Helmholtz by setting temp = 1e3 K
+		c_s : float
+			Sound speed
 		"""
 		press_dumm, e_int, c_s, gamma_dumm, ent_dumm, dummyfail1 = \
 				myhmag.gethelmholtzeos(temp, dens, self.abar, self.zbar, self.togglecoulomb)

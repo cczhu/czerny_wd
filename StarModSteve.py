@@ -19,54 +19,75 @@ class mhs_steve(maghydrostar_core):
 
 	Parameters (Common across maghydrostar)
 	---------------------------------------
-	mass : wanted mass (g)
-	temp_c : wanted central temperature (K).  If you want to use entropy, 
+	mass : float
+		Wanted mass (g)
+	temp_c : float, optional
+		Wanted central temperature (K).  If you want to use entropy, 
 		then populate S_want (code will then ignore this value and 
 		calculate self-consistent temp_c).
-	magprofile : magnetic profile object.  Defaults to false, meaning no 
+	magprofile : magprofile object, optional
+		Magnetic profile object.  Defaults to false, meaning no 
 		magnetic field.  To insert a user-defined field, insert a magf object.
 		To generate a field with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas),
 		insert a float equal to delta.		
-	omega : rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
+	omega : float, optional
+		Rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
 		rotating).  If < 0, code attempts to estimate break-up omega with 
 		self.getomegamax(), if >= 0, uses user defined value.
-	L_want : wanted angular momentum.
-	mintemp : temperature floor (K), effectively switches from adiabatic 
+	L_want : float, optional
+		wanted angular momentum.
+	mintemp : float, optional
+		Temperature floor (K), effectively switches from adiabatic 
 		to isothermal profile if reached.
-	composition : "CO", "Mg" or "He" composition.
-	togglecoulomb : includes Coulomb corrections in EOS (corrections are 
+	composition : string, optional
+		"CO", "Mg" or "He" composition.
+	togglecoulomb : boolean, optional
+		If True, includes Coulomb corrections in EOS (corrections are 
 		included even if specific entropy becomes negative).
-	fakeouterpoint : add additional point to profile where M = mass_want to 
+	fakeouterpoint : boolean, optional
+		If True, add additional point to profile where M = mass_want to 
 		prevent interpolation attempts from failing.
-	stop_invertererr : stop integrating when EOS error is reached.
-	stop_mrat : stop integrating when integrated M is larger than 
+	stop_invertererr : boolean, True
+		If True, stop integrating when EOS error is reached.
+	stop_mrat : float, optional
+		Stop integrating when integrated M is larger than 
 		stop_mrat*mass.
-	stop_positivepgrad : stop integrating when dP/dr becomes positive.
-	stop_mindenserr : density floor, below which integration is halted.
+	stop_positivepgrad : boolean, optional
+		If True, stop integrating when dP/dr becomes positive.
+	stop_mindenserr : float, optional
+		Density floor, below which integration is halted.
 		Default is set to 1e-10 to prevent it from ever being reached.  
 		Helmholtz sometimes has trouble below this 1e-8; try adjusting this
 		value to eliminate inverter errors.
-	mass_tol : fractional tolerance between mass wanted and mass produced 
+	mass_tol : float, optional
+		Fractional tolerance between mass wanted and mass produced 
 		by self.getstarmodel()
-	L_tol : fractional tolerance between L wanted and L produced 
+	L_tol : float, optional
+		Fractional tolerance between L wanted and L produced 
 		by self.getrotatingstarmodel()
-	omega_crit_tol : when using the self.getomegamax() iterative finder, 
+	omega_crit_tol : float, optional
+		When using the self.getomegamax() iterative finder, 
 		absolute error tolerance for maximum omega.
-	nreps : max number of attempts to find a star in self.getstarmodel().
-	stopcount_max : when self.getstarmodel() detects that wanted mass and 
-					temp_c/S_want combination may not be achievable, number 
-					of stellar integration iterations to take before 
-					testing for global extrema.
-	verbose : report happenings within code.
+	nreps : int, optional
+		Max number of attempts to find a star in self.getstarmodel().
+	stopcount_max : int, optional
+		When self.getstarmodel() detects that wanted mass and 
+		temp_c/S_want combination may not be achievable, number 
+		of stellar integration iterations to take before 
+		testing for global extrema.
+	verbose : boolean, optional
+		If True, report happenings within code.
 
 	Parameters (Unique to mhs_steve)
 	---------------------------------
-	S_want : user-specified central entropy (erg/K)
-	S_old : entropy profile spline (with respect to mass m) of previous star 
+	S_want : float
+		User-specified central entropy (erg/K)
+	S_old : entropy_profile object, optional
+		Entropy profile spline (with respect to mass m) of previous star 
 		along runaway track; in cases of extreme convective velocity, switch 
 		to using steve_oS derivative functions when calculated entropy profile 
 		drops below S_old(m).
-	mlt_coeff : ["phil", "wwk", "kippw", "steve"]
+	mlt_coeff : string in ["phil", "wwk", "kippw", "steve"]
 		Sets mixing length theory coefficients for calculating velocity 
 		and superadiabatic temperature gradients.  "phil" is the standard 
 		faire coefficients suggested by Phil Chang; "wwk" is back-derived 
@@ -75,10 +96,13 @@ class mhs_steve(maghydrostar_core):
 		is from Stevenson 1979.  Since Stevenson's rotational and magnetic
 		corrections to convection are expressed as ratios of velocity and
 		temperature gradient, they can be used with any of these mlt_coeffs.
-	densest : central density initial estimate for self.getstarmodel().
-	omegaest : estimate of rigid rotating angular speed.  Default is False
+	densest : float, optional
+		Central density initial estimate for self.getstarmodel().
+	omegaest : float, optional
+		Cstimate of rigid rotating angular speed.  Default is False
 		- code wil then use 0.75*mystar.L_want/I.
-	dontintegrate: don't perform any integration
+	dontintegrate: boolean, optional
+		If true, don't perform any integration
 
 	Returns
 	-------
@@ -171,7 +195,8 @@ class mhs_steve(maghydrostar_core):
 
 		self.derivatives = self.derivatives_steve
 		self.first_deriv = self.first_derivatives_steve
-		self.set_mlt_coeff(mlt_coeff)
+		self.mlt_coeff = mlt_coeff	# Derivative and getconvection will need this for scaled Stevenson
+		self.set_mlt_coeff(self.mlt_coeff)
 		if self.verbose:		# self.verbose is implicitly defined in maghydrostar
 			print "Stevenson 79 derivative selected!  MLT coefficient = {0:s}".format(mlt_coeff)
 
@@ -188,8 +213,8 @@ class mhs_steve(maghydrostar_core):
 				else:
 					self.getstarmodel(densest=densest, S_want=S_want, P_end_ratio=P_end_ratio, ps_eostol=ps_eostol)
 
-			# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
-			assert self.omega >= 0.
+		# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
+		assert self.omega >= 0.
 
 
 	def populateS_old(self, S_old):
@@ -243,10 +268,13 @@ class mhs_steve(maghydrostar_core):
 			nabla_terms["nd"] = self.nab_coeff*(1./delta)*nabla_terms["v_conv_st"]**2/(agrav*H_P)
 			#nabla_terms["nd"] = (1./delta)*(nabla_terms["v_conv_st"]/nabla_terms["c_s_st"])**2		# c_s = sqrt(g*H_P) (Stevenson 79 sentence below Eqn. 37)
 
-			assert nabla_terms["v_conv_st"] >= 0.								# Just in case this somehow becomes negative
+			#assert nabla_terms["v_conv_st"] >= 0.								# nabla_terms["v_conv_st"] can become negative or NaN when H_P becomes negative or NaN
+																				# but the error catchers in integrate_star should fix that, so don't break here.
 
 			if omega > 0.:
 				rossby = nabla_terms["v_conv_st"]/(2.*omega*H_P)					# v_0/(2*omega*H_P)
+				if self.mlt_coeff == "stevecal":									# in the special case of calibrated stevenson, l_m = 3H_P
+					rossby = rossby/3.
 				nabrat = (1. + (6./25./np.pi**2)**(4./5.)*rossby**(-8./5.))**0.5
 				nabla_terms["v_conv_st"] = nabla_terms["v_conv_st"]*nabrat**(-1./4.)
 				nabla_terms["nd"] = nabla_terms["nd"]*nabrat						# obtain v from v_0
@@ -314,11 +342,12 @@ class mhs_steve(maghydrostar_core):
 
 		Parameters
 		----------
-		mlt_type : ["phil", "wwk", "kippw", "steve"]
-					"phil" is the standard faire coefficients suggested by Phil (though probably only used in PC08)
-					"wwk" is back-derived from Woosley, Wunch and Kuhlen 2004
-					"kippw" is from Kippenhahn & Wieigert (identical to Cox & Giuli)
-					"steve" is from Stevenson 1979
+		mlt_type : string in ["phil", "wwk", "kippw", "steve", "stevecal"]
+			"phil" is the standard faire coefficients suggested by Phil (though probably only used in PC08)
+			"wwk" is back-derived from Woosley, Wunch and Kuhlen 2004
+			"kippw" is from Kippenhahn & Wieigert (identical to Cox & Giuli)
+			"steve" is from Stevenson 1979
+			"stevecal" is Stevenson 1979 assuming l_m = 3H_P
 		"""
 
 		if mlt_type == "wwk":
@@ -330,6 +359,9 @@ class mhs_steve(maghydrostar_core):
 		elif mlt_type == "steve":
 			self.nab_coeff = 25.*np.pi**2/6.
 			self.vc_coeff = (25./4./np.pi*(2./5.)**2.5)**(1./3.)
+		elif mlt_type == "stevecal":
+			self.nab_coeff = 25.*np.pi**2/54.
+			self.vc_coeff = (75./4./np.pi*(2./5.)**2.5)**(1./3.)
 		else:
 			self.nab_coeff = 1.
 			self.vc_coeff = 1.
@@ -781,21 +813,28 @@ class mhs_steve(maghydrostar_core):
 	def getconvection_vconv(self):
 		"""Subloop of getconvection that calculates the convective and nuclear velocities - overwrite of StarModCore/getconvection_vconv
 		"""
-		self.data["vconv"] = self.vc_coeff*(self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
-		self.data["vnuc"] = self.vc_coeff*(self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
+		self.data["vconv0"] = self.vc_coeff*(self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fconv"]/self.data["rho"])**(1./3.)
+		self.data["vnuc0"] = self.vc_coeff*(self.data["delta"]*self.data["agrav"]*self.data["H_Preduced"]/self.data["cP"]/self.data["T"]*self.data["Fnuc"]/self.data["rho"])**(1./3.)	# Equivalent convective velocity of entire nuclear luminosity carried away by convection
 
 		# Since in the code we assume vnuc = vconv, and vconv here is our estimate for the MODIFIED
 		# convective velocity due to heating the star, rossby and alfven_ratio are calculated
 		# using vnuc.
 		if self.omega > 0.:
-			rossby = self.data["vnuc"]/(2.*self.omega*self.data["H_Preduced"])	# v_0/(2*omega*H_P)
+			rossby = self.data["vnuc0"]/(2.*self.omega*self.data["H_Preduced"])	# v_0/(2*omega*H_P)
+			if self.mlt_coeff == "stevecal":									# in the special case of calibrated stevenson, l_m = 3H_P
+				rossby = rossby/3.
 			nabrat = (1. + (6./25./np.pi**2)**(4./5.)*rossby**(-8./5.))**0.5
-			self.data["vconv"] = self.data["vconv"]*nabrat**(-1./4.)
-			self.data["vnuc"] = self.data["vnuc"]*nabrat**(-1./4.)
+			self.data["vconv"] = self.data["vconv0"]*nabrat**(-1./4.)
+			self.data["vnuc"] = self.data["vnuc0"]*nabrat**(-1./4.)
 		elif np.mean(self.data["B"]) > 0.:
-			alfrat = self.data["B"]**2/(4.*np.pi*self.data["rho"]*self.data["vnuc"]**2)	# B^2/(4*pi*dens*v_0^2)
-			self.data["vconv"] = self.data["vconv"]*(1. + 0.538*alfrat**(13./8.))**(-4./13.)
-			self.data["vnuc"] = self.data["vnuc"]*(1. + 0.538*alfrat**(13./8.))**(-4./13.)
+			alfrat = self.data["B"]**2/(4.*np.pi*self.data["rho"]*self.data["vnuc0"]**2)	# B^2/(4*pi*dens*v_0^2)
+			self.data["vconv"] = self.data["vconv0"]*(1. + 0.538*alfrat**(13./8.))**(-4./13.)
+			self.data["vnuc"] = self.data["vnuc0"]*(1. + 0.538*alfrat**(13./8.))**(-4./13.)
+		else:
+			self.data["vconv"] = np.array(self.data["vconv0"])
+			self.data["vnuc"] = np.array(self.data["vnuc0"])
+			del self.data["vconv0"]
+			del self.data["vnuc0"]
 
 
 ########################################### BLANK STARMOD FOR POST-PROCESSING #############################################

@@ -172,12 +172,13 @@ def tc_get_marten_WD(dens_c, temp_c):
 	os.system("./martenwdmaker/martenwd {0:.6e} {1:.6e} {2:.6e} {3:.6e} > martentemp.txt".format(dens_c, temp_c, 0., 1e5))
 
 	f = open("martentemp.txt", 'r')
-	data2 = np.loadtxt(f, usecols=(0,1,2))
+	data2 = np.loadtxt(f, usecols=(0,1,2,3))
 
 	out = {}
 	out["R"] = data2[:,0]
 	out["dens"] = data2[:,1]
 	out["M"] = data2[:,2]
+	out["temp"] = data2[:,3]
 	
 	f.close()
 	os.system("rm martentemp.txt")
@@ -230,8 +231,8 @@ def tc_run_suite():
 	###### RUN MARTEN CODE COMPARISON ####
 	# Set M = 1.15 Msun
 	# Coulomb = off
-	static_S = [1e7,2e7,3e7,4e7,5e7] + list(10.**arange(np.log10(6e7), np.log10(2.2e8*1.01), 0.005))
-	od = rw.make_runaway(starmass=1.15*1.9891e33, mymag=False, omega=0., S_arr=static_S, mintemp=1e5, tog_coul=False, stop_mindenserr=1e-10, mass_tol=1e-6, P_end_ratio=1e-8, simd_userot=False, simd_usegammavar=False, simd_usegrav=False, simd_suppress=False, verbose=True)
+	static_S = [1e7,2e7,3e7,4e7,5e7] + list(10.**np.arange(np.log10(6e7), np.log10(2.2e8*1.01), 0.005))
+	od = rw.make_runaway(starmass=1.15*1.9891e33, mymag=False, omega=0., S_arr=static_S, mintemp=1e5, stop_mindenserr=1e-10, mass_tol=1e-6, P_end_ratio=1e-8, simd_userot=False, simd_usegammavar=False, simd_usegrav=False, verbose=True)
 
 	tc_check_vs_marten(od)
 
