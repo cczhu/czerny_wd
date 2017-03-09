@@ -65,8 +65,8 @@ def obtain_model(mystar, i, r_in, omega_warn=10., verbose=False):
 	return outerr_code
 
 
-def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), 
-						mlt_coeff="phil", uvs_k=3, uvs_s=None,
+def make_runaway_steve_coeff(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), 
+						uvs_k=3, uvs_s=None, nab_coeff=1., vc_coeff=1.,
 						mintemp=1e5, S_old=False, mass_tol=1e-6, P_end_ratio=1e-8, 
 						densest=False, stop_mindenserr=1e-10, L_tol=1e-6, keepstars=False, 
 						omega_crit_tol=1e-3, omega_warn=10., de_err_tol=[1e6, 1e7], verbose=True):
@@ -121,7 +121,7 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 			"S_arr": S_arr, 
 			"mintemp": mintemp,  
 			"S_old": S_old, 
-			"mlt_coeff": mlt_coeff,
+			"mlt_coeff": "custom",
 			"composition": "CO",
 			"tog_coul": True,
 			"P_end_ratio": P_end_ratio, 
@@ -139,7 +139,9 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 			"lowerr_tol": de_err_tol[0],
 			"mederr_tol": de_err_tol[1],
 			"uvs_k": uvs_k,
-			"uvs_s": uvs_s}
+			"uvs_s": uvs_s,
+			"nab_coeff": nab_coeff,
+			"vc_coeff": vc_coeff}
 
 	if (omega != 0) or mymag:
 		print "*************You want to make an MHD/rotating star; let's first try making a stationary pure hydro star!************"
@@ -152,7 +154,7 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 							stop_positivepgrad=r_in["stop_positivepgrad"], stop_mindenserr=r_in["stop_mindenserr"], 
 							densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
 							omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
-		hdensest = 0.75*hstar.data["rho"][0]
+		hdensest = 0.9*hstar.data["rho"][0]
 	else:
 		hdensest = r_in["densest"]
 
@@ -165,7 +167,22 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 							stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], 
 							stop_positivepgrad=r_in["stop_positivepgrad"], stop_mindenserr=r_in["stop_mindenserr"], 
 							densest=hdensest, mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
-							omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+							omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose, dontintegrate=True)
+
+	############ NEW STUFF #############
+
+	mystar.nab_coeff = 1.
+	mystar.vc_coeff = r_in["vc_coeff"]
+
+	if r_in["omega"] < 0.:
+		mystar.omega = 0.
+		mystar.getmaxomega(P_end_ratio=r_in["P_end_ratio"], densest=hdensest, S_want=False, ps_eostol=r_in["ps_eostol"])
+	else:
+		mystar.getstarmodel(densest=hdensest, S_want=False, P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"])
+
+	####################################
+
+# Checks omega, just to make sure user didn't initialze a "dontintegrate" but set omega < 0
 
 	if r_in["omega"] < 0:
 		print "FOUND critical Omega = {0:.3e}!  We'll use {1:.3e} of this value for the runaway.".format(mystar.omega, r_in["omega_run_rat"])

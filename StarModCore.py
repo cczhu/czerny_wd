@@ -649,7 +649,7 @@ class maghydrostar_core():
 
 	def getBcnabladevmodel(self, Bc_want, nabladev_est=0.001, Bc_tol=1e-4, mass_user=False, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, deltastepcoeff=0.1, out_search=False):
 		"""
-		Wrapper to obtain WD with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas) 
+		Wrapper to obtain WD with constant delta field
 		with user-specified central magnetic field strength Bc.  Calls 
 		getstarmodel as a subloop to obtain stars with a specific mass.  
 		Arguments not listed below have identical meanings as class 
@@ -741,7 +741,7 @@ class maghydrostar_core():
 
 	def getEBnabladevmodel(self, EBrat_want, nabladev_est=0.001, EBr_tol=1e-4, mass_user=False, densest=False, S_want=False, P_end_ratio=1e-8, ps_eostol=1e-8, deltastepcoeff=0.1, out_search=False):
 		"""
-		Wrapper to obtain WD with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas) 
+		Wrapper to obtain WD with constant delta
 		with user-specified ratio between total magnetic and total energy 
 		E_B/E_tot.  Calls getstarmodel as a subloop to obtain stars with a 
 		specific mass.  Arguments not listed below have identical meanings as 

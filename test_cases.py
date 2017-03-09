@@ -9,11 +9,32 @@
 
 import numpy as np
 import scipy.interpolate as sci_interp
+import scipy.integrate as sci_integ
+from scipy.interpolate import UnivariateSpline
 import StarMod as Star
 import runaway as rw
 import os, sys
+import copy
+import rhoTcontours as rtc
+import matplotlib.pyplot as plt
+
+sys.path.append("/home/cczhu/Runaway")
+import runaway_prod_anal_func as rpaf
 
 ##################### SUPPORT FUNCTIONS ####################
+
+def remove_unfinished_runs(od):
+	i_cut = max((od["dens_c"] > 0).nonzero()[0])
+	odnew = {}
+	for item in od.keys():
+		if item == 'run_inputs':
+			odnew[item] = copy.deepcopy(od[item])
+		else:
+			try:
+				odnew[item] = copy.deepcopy(od[item][:i_cut+1])
+			except:
+				odnew[item] = copy.deepcopy(od[item])
+	return odnew
 
 
 def tc_recast_array(X, Y, Xr):
@@ -30,33 +51,58 @@ def tc_recast_array(X, Y, Xr):
 
 def tc_get_ratio_uneven_arrays(X1, Y1, X2, Y2, returntype=None):
 	"""Checks the ratio of two stellar profiles ([X1, Y1] and [X2, Y2]) that may have different lengths.
+	Assumes X starts at 0.
 
-	Arguments:
-	X1/Y1: x and y values of profile 1
-	X2/Y2: x and y values of profile 2
+	Parameters 
+	----------
+	X1/Y1 : x and y values of profile 1
+	X2/Y2 : x and y values of profile 2
 	"""
 	if max(X1) > max(X2):
-		X_spline = X1
-		Y_spline = Y1
 		X_use = X2
-		Y_use = Y2
+		Ysout = UnivariateSpline(X1, Y1, k=1, s=0, ext=3)
+		Y1 = Ysout(X_use)
 	else:
-		X_spline = X2
-		Y_spline = Y2
 		X_use = X1
-		Y_use = Y1
-	Ysout = UnivariateSpline(X_spline, Y_spline, k=1, s=0, ext=3)
-	Y_num = Ysout(X_use)
+		Ysout = UnivariateSpline(X2, Y2, k=1, s=0, ext=3)
+		Y2 = Ysout(X_use)
 	if returntype == "extrema":
-		return [X_use, Y_num/Y_use, max(Y_num/Y_use), min(Y_num/Y_use)]
+		return [X_use, Y1/Y2, max(Y1/Y2), min(Y1/Y2)]
 	elif returntype == "err":
-		return [X_use, abs(Y_num - Y_use)/Y_use]
+		return [X_use, abs(Y1 - Y2)/Y2]
 	else:
-		return [X_use, Y_num/Y_use]
+		return [X_use, Y1/Y2]
+
+
+#def tc_get_ratio_uneven_arrays_OLD(X1, Y1, X2, Y2, returntype=None):
+#	"""Checks the ratio of two stellar profiles ([X1, Y1] and [X2, Y2]) that may have different lengths.
+
+#	Arguments:
+#	X1/Y1: x and y values of profile 1
+#	X2/Y2: x and y values of profile 2
+#	"""
+#	if max(X1) > max(X2):
+#		X_spline = X1
+#		Y_spline = Y1
+#		X_use = X2
+#		Y_use = Y2
+#	else:
+#		X_spline = X2
+#		Y_spline = Y2
+#		X_use = X1
+#		Y_use = Y1
+#	Ysout = UnivariateSpline(X_spline, Y_spline, k=1, s=0, ext=3)
+#	Y_num = Ysout(X_use)
+#	if returntype == "extrema":
+#		return [X_use, Y_num/Y_use, max(Y_num/Y_use), min(Y_num/Y_use)]
+#	elif returntype == "err":
+#		return [X_use, abs(Y_num - Y_use)/Y_use]
+#	else:
+#		return [X_use, Y_num/Y_use]
 
 
 def tc_checkmodeltol(od):
-	"""Checks if mass and angular momentum are self-consistent with mass tolerance.  Magnetic flux conservation should be checked too, of course, but that is not formally bounded in the runaway code, so should be checked separately.
+	"""Checks if mass and angular momentum are self-consistent with mass tolerance.  Magnetic flux conservation should be checked too, of course, but that is not formally bounded in the runaway code, so is checked separately under runaway_prod_anal_func.py.
 	"""
 	Msun = 1.9891e33
 	print "User-defined mass relative tolerance: {0:e}".format(od["run_inputs"]["mass_tol"])
@@ -67,12 +113,13 @@ def tc_checkmodeltol(od):
 		print "M_{0:d} = {1:e} Msun, relative err {2:e}".format(i, masses[i]/Msun, abs(masses[i] - M_want)/M_want)
 	print "Violators, if any, are: ", np.arange(len(od["stars"]), dtype=int)[abs(masses - od["run_inputs"]["mass"])/od["run_inputs"]["mass"] > od["run_inputs"]["mass_tol"]]
 	tester = Star.maghydrostar.blankstar(od["stars"][0])
-	Ltot = np.zeros(len(od["stars"]))
-	L_original = od["run_inputs"]["L_original"]
-	for i in range(len(od["stars"])):
-		Ltot[i] = tester.getmomentofinertia(od["stars"][i]["R"], od["stars"][i]["rho"])[-1]*od["omega"][i]
-		print "L_{0:d} = {1:e} g cm^2/s, relative err {2:e}".format(i, Ltot[i], abs(Ltot[i] - L_original)/L_original)
-	print "Violators, if any, are: ", np.arange(len(od["stars"]), dtype=int)[abs(Ltot - L_original)/L_original > od["run_inputs"]["L_tol"]]
+	if od["run_inputs"]["omega"] > 0:
+		Ltot = np.zeros(len(od["stars"]))
+		L_original = od["run_inputs"]["L_original"]
+		for i in range(len(od["stars"])):
+			Ltot[i] = tester.getmomentofinertia(od["stars"][i]["R"], od["stars"][i]["rho"])[-1]*od["omega"][i]
+			print "L_{0:d} = {1:e} g cm^2/s, relative err {2:e}".format(i, Ltot[i], abs(Ltot[i] - L_original)/L_original)
+		print "Violators, if any, are: ", np.arange(len(od["stars"]), dtype=int)[abs(Ltot - L_original)/L_original > od["run_inputs"]["L_tol"]]
 
 #def checkmodelfull(out_dict):
 #	print "Checking self-consistency of runaway track..."
@@ -215,11 +262,119 @@ def tc_check_vs_marten(od, tol=1e-3):
 
 ######### CHECK SUPERADIABATICITY SELF-CONSISTENCY #########
 
+def recalc_temp_derivative(dc, vc_coeff=1., nab_coeff=1.):
+	"""Recalculates dT/dm of stellar profile, to check if they're accurate.
+	Doesn't include s_old(m) formulation or temperature floor, so it will NOT
+	give exact answers after some critical point. 
+	"""
 
-def recalc_nd():
+	i = 0
+	for dcd in dc["stars"]:
+		H_P = -dcd["Pgas"]/dcd["dy"][:,1]*dcd["dy"][:,0]
+		H_Pred = (dcd["Pgas"]/(6.67e-8*dcd["rho"]**2))**0.5
+		args = H_P/H_Pred >= 1.; H_P[args] = H_Pred[args]
+		agrav = dcd["M"]*6.67e-8/dcd["R"]**2
+		dcd["vnuc0_test"] = vc_coeff*(dcd["delta"]*agrav*H_P/dcd["cP"]/dcd["T"]*dcd["Lnuc"]/4./np.pi/dcd["R"]**2/dcd["rho"])**(1./3.)
+		dcd["nab0_test"] = nab_coeff*dcd["vnuc0_test"]**2/agrav/dcd["delta"]/H_P
+		if dc["omega"][i] > 0:
+			rossby = dcd["vnuc0_test"]/(2.*dc["omega"][i]*H_P)
+			if vc_coeff < 0.99:		# for steve_cal
+				rossby = rossby/3.
+			epsr = (1. + (6./25./np.pi**2)**(4./5.)*rossby**(-8./5.))**0.5
+			vconvr = epsr**-0.25
+		elif dc["B_c"][i] > 0:
+			alfrat = dcd["B"]**2/(4.*np.pi*dcd["rho"]*dcd["vnuc0_test"]**2)
+			epsr = (1. + 0.18*alfrat**(6./5.))**(5./6.)
+			vconvr = (1. + 0.538*alfrat**(13./8.))**(-4./13.)
+		else:
+			epsr = 1.
+			vconvr = 1.
+		dcd["nab_test"] = epsr*dcd["nab0_test"]
+		dcd["vconv_test"] = vconvr*dcd["vnuc0_test"]
+		totalgrad = dcd["nabla_ad"] + dcd["nab_test"]
+		dcd["dTdm_test"] = dcd["T"]/dcd["Pgas"]*totalgrad*dcd["dy"][:,1]
+		dcd["dTdmrat"] = dcd["dy"][:,2]/dcd["dTdm_test"]	# Because doing the reverse will lead to more singularities
+		dcd["vcrat"] = dcd["vconv_test"]/dcd["v_conv_st"]
+		i += 1
 
-	print "NOT THERE YET"
 
+def recalc_wwk04_exploder(dc, lrn=0.95, usevconv=False):
+	"""Double-check WWK04 calculations in main code.
+
+	Parameters
+	---------
+	dc : StarMod data container
+		Data container of runaway
+	lrn : float
+		Fraction of L_nuc enclosed within R_nuc.  Defaults to 0.95
+	usevconv : bool
+		If true, use dc["stars"][i]["vconv"] rather than "vnuc".  You should
+		NOT USE THIS for production-run checking - this is only here because I
+		found a bug (now fixed) in the runaway_prod_anal_func.py/find_exploder() 
+		function that used vconv rather than vnuc.  Defaults to False, obviously.
+	"""
+
+	dc = remove_unfinished_runs(dc)
+
+	wwk04_integral = np.zeros(len(dc["S_c"]))
+	for i in range(len(dc["S_c"])):
+		i_nuc = min(np.where(dc["stars"][i]["Lnuc"]/max(dc["stars"][i]["Lnuc"]) > lrn)[0])
+		dTdr = dc["stars"][i]["dy"][:,2]/dc["stars"][i]["dy"][:,0]		# dT/dr = dT/dm*dm/dr
+		if usevconv:
+			wwkint = sci_integ.cumtrapz(dTdr + dc["stars"][i]["eps_nuc"]/dc["stars"][i]["cP"]/dc["stars"][i]["vconv"], x=dc["stars"][i]["R"], initial=0.)
+		else:
+			wwkint = sci_integ.cumtrapz(dTdr + dc["stars"][i]["eps_nuc"]/dc["stars"][i]["cP"]/dc["stars"][i]["vnuc"], x=dc["stars"][i]["R"], initial=0.)
+		wwk04_integral[i] = wwkint[i_nuc]
+
+	try:
+		return min(np.where(wwk04_integral > 0.)[0])
+	except:
+		return -1
+
+
+def recalc_igniter(dc, td=None):
+
+	if not td:
+		td = rtc.timescale_data(max_axes=[1e12, 1e12])
+
+	ign_line = td.get_tauneunuc_line()
+
+	for i in range(dc["temp_c"].size):
+		if dc["temp_c"][i] > ign_line(dc["dens_c"][i]):
+			return i
+
+
+def recalc_esline():
+
+	td = rtc.timescale_data(max_axes=[1e12, 1e12])
+	td.data_p["esgrid"] = 31.7*td.data_p["tau_cdyn"]/td.data_p["tau_nuc"]/td.data_p["delta"]**0.5
+	plt.figure()
+	cts = plt.contour(td.rho_p, td.T_p, td.data_p["esgrid"], [1.])
+	plt.close()
+
+	v = cts.collections[0].get_paths()[0].vertices
+
+	esline = sci_interp.interp1d(v[:,0], v[:,1], kind="linear")
+
+	return [esline, td]
+
+
+def recalc_es(od, esline=False, td=False):
+
+	if not esline:
+		esline = recalc_esline()[0]
+
+	if not td:
+		td = rtc.timescale_data(max_axes=[1e12, 1e12])
+
+	rho_od = od["dens_c"].copy(); rho_od[od["dens_c"] < min(td.rho_r)] = min(td.rho_r)
+	T_esline = esline(rho_od)
+	models_past_esline = np.where(T_esline < od["temp_c"])[0]
+
+	if models_past_esline.size > 0:
+		return min(models_past_esline)
+	else:
+		return -1
 
 ##################### TEST SUITE ###########################
 

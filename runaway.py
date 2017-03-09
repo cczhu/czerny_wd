@@ -137,7 +137,9 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 								stop_positivepgrad=r_in["stop_positivepgrad"], stop_mindenserr=r_in["stop_mindenserr"], 
 								densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
 								omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
-		densest=0.9*hstar.data["rho"][0]
+		hdensest = 0.9*hstar.data["rho"][0]
+	else:
+		hdensest = r_in["densest"]
 
 	print "*************Okay, let's make a low-temperature (possibly MHD/rotating) star************"
 	mystar = Star.maghydrostar(r_in["mass"], max(5e6,mintemp), magprofile=mymag, omega=r_in["omega"], S_want=False, 	#Rest after this is identical to function call above
@@ -147,7 +149,7 @@ def make_runaway(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.
 								P_end_ratio=r_in["P_end_ratio"], ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], 
 								stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], 
 								stop_positivepgrad=r_in["stop_positivepgrad"], stop_mindenserr=r_in["stop_mindenserr"], 
-								densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
+								densest=hdensest, mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
 								omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
 
 	# If we use a high-temperature mintemp, remove any S_arr

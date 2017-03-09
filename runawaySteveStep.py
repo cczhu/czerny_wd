@@ -65,7 +65,7 @@ def obtain_model(mystar, i, r_in, omega_warn=10., verbose=False):
 	return outerr_code
 
 
-def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), 
+def make_runaway_steve_step(starmass=1.2*1.9891e33, mystepsize=1., mymag=False, omega=0., omega_run_rat=0.8, S_arr=10**np.arange(7.5,8.2,0.25), 
 						mlt_coeff="phil", uvs_k=3, uvs_s=None,
 						mintemp=1e5, S_old=False, mass_tol=1e-6, P_end_ratio=1e-8, 
 						densest=False, stop_mindenserr=1e-10, L_tol=1e-6, keepstars=False, 
@@ -115,6 +115,7 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 		mymagsave = False
 
 	r_in = {"mass": starmass, 
+			"mystepsize": mystepsize,
 			"magprofile": mymagsave, 
 			"omega": omega, 
 			"omega_run_rat": omega_run_rat, 
@@ -152,9 +153,7 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 							stop_positivepgrad=r_in["stop_positivepgrad"], stop_mindenserr=r_in["stop_mindenserr"], 
 							densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
 							omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
-		hdensest = 0.75*hstar.data["rho"][0]
-	else:
-		hdensest = r_in["densest"]
+		densest=0.9*hstar.data["rho"][0]
 
 	print "*************Okay, let's make a low-temperature (MHD/rotating) star************"
 	#Rest after this is identical to function call above
@@ -164,8 +163,10 @@ def make_runaway_steve(starmass=1.2*1.9891e33, mymag=False, omega=0., omega_run_
 							ps_eostol=r_in["ps_eostol"], fakeouterpoint=r_in["fakeouterpoint"], 
 							stop_invertererr=r_in["stop_invertererr"], stop_mrat=r_in["stop_mrat"], 
 							stop_positivepgrad=r_in["stop_positivepgrad"], stop_mindenserr=r_in["stop_mindenserr"], 
-							densest=hdensest, mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
+							densest=r_in["densest"], mass_tol=r_in["mass_tol"], L_tol=r_in["L_tol"], 
 							omega_crit_tol=r_in["omega_crit_tol"], nreps=100, verbose=verbose)
+
+	mystar.stepcoeff = r_in["mystepsize"]*1e-2
 
 	if r_in["omega"] < 0:
 		print "FOUND critical Omega = {0:.3e}!  We'll use {1:.3e} of this value for the runaway.".format(mystar.omega, r_in["omega_run_rat"])

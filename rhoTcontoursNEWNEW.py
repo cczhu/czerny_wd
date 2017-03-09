@@ -15,20 +15,23 @@ class timescale_data:
 		self.sectoyear = 60.0**2*24.0*365.0
 		self.grav = 6.67384e-8
 
-		mf = open("/home/cczhu/Dropbox/MyPrograms/StarMod/co.out",'r-')
-		data = np.loadtxt(mf, skiprows = 1)
+		mf = open("/home/cczhu/martenwdmaker/geteosetc/co_new.out",'r-')
+		data = np.loadtxt(mf, skiprows = 3)
 
 		self.data = {}
 
+		# T, Rho, P, E, S, Cp, eta, gamma1, gamma3, eps_neu, eps_nuc
 		self.data["T"] = data[:,0]
 		self.data["rho"] = data[:,1]
 		self.data["P"] = data[:,2]
 		self.data["E"] = data[:,3]
 		self.data["S"] = data[:,4]
-		self.data["eta"] = data[:,5]		#I have no idea what this is
-		self.data["Cp"] = data[:,6]	
-		self.data["eps_neu"] = data[:,7]	#neutrino losses
-		self.data["eps_nuc"] = data[:,8]	#carbon fusion
+		self.data["Cp"] = data[:,5]	
+		self.data["eta"] = data[:,6]		#I have no idea what this is
+		self.data["gamma1"] = data[:,7]
+		self.data["gamma3"] = data[:,8]
+		self.data["eps_neu"] = data[:,9]	#neutrino losses
+		self.data["eps_nuc"] = data[:,10]	#carbon fusion
 
 		self.data["tau_neu"] = self.data["Cp"]*self.data["T"]/self.data["eps_neu"]/self.sectoyear
 		self.data["tau_nuc"] = self.data["Cp"]*self.data["T"]/self.data["eps_nuc"]/self.sectoyear	#tau_cc, or t_h
@@ -36,7 +39,6 @@ class timescale_data:
 		self.data["tau_cdyn"] = (self.grav*self.data["rho"])**(-0.5)/self.sectoyear
 		self.data["tau_dyn"] = 7.36*(self.grav*self.data["rho"])**(-0.5)/self.sectoyear # 1/sqrt(\bar{rho}) = 7.36/sqrt(rho_c), from K&W, Table 19.1 (5/3 polytrope)
 		self.getP0()
-		self.getdelta()
 
 		self.data["tau_eq_neunuc"] = self.data["tau_neu"] - self.data["tau_nuc"]
 		self.data["tau_eq_cdnuc"] = self.data["tau_cdyn"] - self.data["tau_nuc"]
@@ -60,16 +62,6 @@ class timescale_data:
 		self.data["P0"] = np.zeros(len(self.data["rho"]))
 		for i in range(len(self.data["rho"])):
 			self.data["P0"][i],energ,sound,gammaout,entropy,dummyfail = myhmag.gethelmholtzeos(1000.,self.data["rho"][i],abar,zbar,True)
-
-
-	def getdelta(self):
-		"""Calculates logarithmic coefficient of thermal expansion."""
-		myhmag.initializehelmholtz()
-		abar = 13.714285714285715
-		zbar = abar/2.0
-		self.data["delta"] = np.zeros(len(self.data["rho"]))
-		for i in range(len(self.data["rho"])):
-			adgradred,hydrograd,my_nu,my_alpha,self.data["delta"][i],my_gamma1,my_cp,my_cph,my_c_s,failtrig = myhmag.gethelmgrads(self.data["T"][i], self.data["rho"][i], 0.,abar,zbar,True)
 
 
 	def getdatap(self, max_axes):
@@ -105,34 +97,16 @@ class timescale_data:
 
 		T_zero = np.zeros(self.len_p[0])
 		for i in range(self.len_p[0]):
-			T_zero[i] = self.findzero(self.T_p,self.data_p["tau_eq_cdnuc"][:,i])
+			T_zero[i] = self.findzero(self.T_p,self.data_p["tau_eq_dynnuc"][:,i])
 		f = interp.interp1d(self.rho_p, T_zero)
 		return f
 
-	# CHECKED by plotting resulting line vs. ax.contour for tau_eq_neunuc = 1
+
 	def get_tauneunuc_line(self):
 
 		T_zero = np.zeros(self.len_p[0])
 		for i in range(self.len_p[0]):
 			T_zero[i] = self.findzero(self.T_p,self.data_p["tau_eq_neunuc"][:,i])
-		f = interp.interp1d(self.rho_p, T_zero)
-		return f
-
-
-	def get_es(self):
-		"""Obtains tau_nuc/tau_cdyn*delta^(1/2), which is proportional to the end of simmering line."""
-		if not self.data_p.has_key("delta"):
-			self.getdelta()
-		self.data_p["endsimmer"] = self.data_p["tau_nuc"]/self.data_p["tau_cdyn"]*self.data_p["delta"]**0.5
-
-
-	def get_esline(self, linepoint=31.7):
-		if not self.data_p.has_key("endsimmer"):
-			self.get_es()
-		endsimmer_subtract = linepoint - self.data_p["endsimmer"]
-		T_zero = np.zeros(self.len_p[0])
-		for i in range(self.len_p[0]):
-			T_zero[i] = self.findzero(self.T_p,endsimmer_subtract[:,i])
 		f = interp.interp1d(self.rho_p, T_zero)
 		return f
 
@@ -151,15 +125,17 @@ class timescale_data:
 	def findzero(x,y):
 		"""Finds root for a monatonic sampled function y(x).
 		"""
-		args = np.where(y > 0)[0]
+		yc = np.array(y)
+		yc[np.isinf(y)] = -1e100
+		args = np.where(yc > 0)[0]
 		if len(args) == 0:
 			print "Unable to find zero! Using maximum T."
-			i = len(y) - 1
+			i = len(yc) - 1
 		else:
 			i = min(args)
 
 		#Do a fit using the surrounding points, and perform interpolation based on that
-		p = np.polyfit(x[i-1:i+1],y[i-1:i+1],1)
+		p = np.polyfit(x[i-1:i+1],yc[i-1:i+1],1)
 		yfit = p[0]*x[i-1:i+1] + p[1]
 		f = interp.interp1d(yfit, x[i-1:i+1])
 		return float(f(0))
@@ -183,7 +159,7 @@ def get_timescale_lines(ax, td):
 		ax.clabel(cs, fontsize=14, inline=1, fmt=nucr_clabel[i])
 
 	S_N = [1e8, 10**8.1, 10**8.2]
-	S_clabel = [r'$s = 10^8$',r'$10^{8.1}$',r'$10^{8.2}$']
+	S_clabel = [r'$S = 10^8$',r'$10^{8.1}$',r'$10^{8.2}$']
 
 	for i in range(len(S_N)):
 		cs = ax.contour(td.rho_p, td.T_p, td.data_p["S"], [S_N[i]], colors='g', linestyles='dotted', linewidth=4)

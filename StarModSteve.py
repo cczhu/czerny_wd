@@ -28,7 +28,7 @@ class mhs_steve(maghydrostar_core):
 	magprofile : magprofile object, optional
 		Magnetic profile object.  Defaults to false, meaning no 
 		magnetic field.  To insert a user-defined field, insert a magf object.
-		To generate a field with constant delta = B^2/(B^2 + 4pi*Gamma1*Pgas),
+		To generate a field with constant delta = B^2/(8*pi*Pgas),
 		insert a float equal to delta.		
 	omega : float, optional
 		Rigid rotation angular velocity (rad/s).  Defaults to 0 (non-
