@@ -19,7 +19,7 @@ I don't guarantee that the code will work (though it likely will) for Python bui
 To build, first switch line 1324 of myhelm_magstar.f90 from
 
 ```fortran
-open(unit=19,file='/home/cczhu/GitHubTemp/czerny_wd/helm_table.dat',status='old')
+open(unit=19,file='/home/cczhu/GitHub/czerny_wd/helm_table.dat',status='old')
 ```
 to whichever filepath your repo is located at.
 

@@ -1327,7 +1327,7 @@
 
 ! open the file (use softlinks to input the desired table)
 
-       open(unit=19,file='/home/cczhu/GitHubTemp/czerny_wd/helm_table.dat',status='old')
+       open(unit=19,file='/home/cczhu/GitHub/czerny_wd/helm_table.dat',status='old')
 
 
 ! for standard table limits
